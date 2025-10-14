@@ -33,18 +33,11 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: '/aptos',
         label: '合约交互',
         description: '动态 ABI 表单与交易提交。'
-      }
-    ]
-  },
-  {
-    id: 'general',
-    label: '通用工具',
-    hint: '跨链通用的实用工具',
-    items: [
+      },
       {
         path: '/bcs',
         label: 'BCS 编/解码',
-        description: '快速处理常见原语和字节数组。'
+        description: 'BCS 原语、地址与字节数组处理。'
       }
     ]
   }

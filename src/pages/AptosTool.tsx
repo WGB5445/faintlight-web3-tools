@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useWallet, WalletReadyState } from '@aptos-labs/wallet-adapter-react';
+import type { InputEntryFunctionData } from '@aptos-labs/ts-sdk';
+
 import { APTOS_NETWORKS, resolveRestEndpoint } from '../lib/networks';
-import { fetchModuleAbi, getExplorerTxUrl, MoveModuleAbi, submitEntryFunction } from '../lib/aptos';
+import { fetchModuleAbi, getExplorerTxUrl, MoveModuleAbi, submitEntryFunction, waitForTransaction } from '../lib/aptos';
 import { getTypeLabel, simplifyType, SimpleTypeTag } from '../lib/abi';
 import { decodePrimitive, hexToBytes, toPrimitiveType } from '../lib/bcs';
 
 type ArgMode = 'raw' | 'hex' | 'bcs';
+type SubmissionMode = 'wallet' | 'privateKey';
+
+type WalletItem = ReturnType<typeof useWallet>['wallets'][number];
 
 interface ArgState {
   mode: ArgMode;
@@ -94,8 +100,28 @@ function convertBcsValue(tag: SimpleTypeTag, value: string) {
   return decoded;
 }
 
+function truncateAddress(address: string) {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+function extractTxnHash(value: unknown): string {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    const hash = (value as Record<string, unknown>).hash ?? (value as Record<string, unknown>).transactionHash;
+    if (typeof hash === 'string') return hash;
+  }
+  return '';
+}
+
+function isWalletSelectable(wallet: WalletItem) {
+  return wallet.readyState === WalletReadyState.Installed || wallet.readyState === WalletReadyState.Loadable;
+}
+
 export default function AptosToolPage() {
   const [networkId, setNetworkId] = useState<'mainnet' | 'testnet' | 'devnet' | 'custom'>('testnet');
+  const [submissionMode, setSubmissionMode] = useState<SubmissionMode>('wallet');
   const [customEndpoint, setCustomEndpoint] = useState('');
   const [moduleId, setModuleId] = useState('');
   const [moduleLoading, setModuleLoading] = useState(false);
@@ -105,9 +131,19 @@ export default function AptosToolPage() {
   const [typeArgValues, setTypeArgValues] = useState<string[]>([]);
   const [argStates, setArgStates] = useState<ArgState[]>([]);
   const [privateKey, setPrivateKey] = useState('');
+  const [walletFeedback, setWalletFeedback] = useState<string | null>(null);
   const [submission, setSubmission] = useState<SubmissionState>({ status: 'idle' });
 
+  const wallet = useWallet();
+  const { wallets, connect, disconnect, connected, account, wallet: activeWallet, network: walletNetwork, signAndSubmitTransaction } = wallet;
+
   const restEndpoint = useMemo(() => resolveRestEndpoint(networkId, customEndpoint), [networkId, customEndpoint]);
+
+  const availableWallets = useMemo(() => wallets.filter(isWalletSelectable), [wallets]);
+  const walletAddress = account?.address ?? '';
+  const normalizedWalletNetwork = walletNetwork?.name ? walletNetwork.name.toLowerCase() : null;
+  const networkMismatch =
+    submissionMode === 'wallet' && normalizedWalletNetwork && networkId !== 'custom' && normalizedWalletNetwork !== networkId;
 
   const entryFunctions = useMemo(() => {
     if (!moduleAbi) return [];
@@ -218,35 +254,94 @@ export default function AptosToolPage() {
     return outputs;
   };
 
+  const handleWalletConnect = async (walletName: string) => {
+    try {
+      setWalletFeedback(null);
+      await connect(walletName);
+    } catch (error) {
+      setWalletFeedback(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleWalletDisconnect = async () => {
+    try {
+      await disconnect();
+      setWalletFeedback(null);
+    } catch (error) {
+      setWalletFeedback(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedFn || !moduleAbi) return;
-    if (!privateKey.trim()) {
-      setSubmission({ status: 'error', message: '请输入发送者私钥（Hex）' });
-      return;
-    }
-    const trimmedTypeArgs = typeArgValues.map((item) => item.trim());
+
+    const trimmedTypeArgs = typeArgValues.map((item) => item.trim()).slice(0, selectedFn.generic_type_params.length);
     if (trimmedTypeArgs.length !== selectedFn.generic_type_params.length) {
       setSubmission({ status: 'error', message: '类型参数数量与 ABI 不匹配。' });
       return;
     }
-    if (trimmedTypeArgs.some((value) => value.length === 0)) {
+    if (trimmedTypeArgs.length > 0 && trimmedTypeArgs.some((value) => value.length === 0)) {
       setSubmission({ status: 'error', message: '请补全所有类型参数。' });
       return;
     }
-    try {
-      const args = buildArguments();
-      const data = {
-        function: `${moduleAbi.address}::${moduleAbi.name}::${selectedFn.name}`,
-        typeArguments: trimmedTypeArgs,
-        functionArguments: args
-      } as const;
 
+    let args: unknown[];
+    try {
+      args = buildArguments();
+    } catch (error) {
+      setSubmission({ status: 'error', message: error instanceof Error ? error.message : String(error) });
+      return;
+    }
+
+    const payload: InputEntryFunctionData = {
+      function: `${moduleAbi.address}::${moduleAbi.name}::${selectedFn.name}`,
+      typeArguments: trimmedTypeArgs,
+      functionArguments: args
+    };
+
+    if (submissionMode === 'wallet') {
+      if (!connected || !account) {
+        setSubmission({ status: 'error', message: '请先连接支持的 Aptos 钱包。' });
+        return;
+      }
+      setSubmission({ status: 'submitting' });
+      try {
+        const pending = await signAndSubmitTransaction({ sender: account.address, data: payload });
+        const hash = extractTxnHash(pending);
+        if (!hash) {
+          setSubmission({ status: 'error', message: '钱包未返回有效的交易哈希。' });
+          return;
+        }
+
+        if (restEndpoint) {
+          try {
+            await waitForTransaction(restEndpoint, hash);
+          } catch (error) {
+            console.warn('等待交易确认失败:', error);
+          }
+        }
+
+        const explorerUrl = getExplorerTxUrl(networkId, hash);
+        setSubmission({ status: 'success', hash, explorerUrl });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        setSubmission({ status: 'error', message });
+      }
+      return;
+    }
+
+    if (!privateKey.trim()) {
+      setSubmission({ status: 'error', message: '请输入发送者私钥（Hex）。' });
+      return;
+    }
+
+    try {
       setSubmission({ status: 'submitting' });
       const result = await submitEntryFunction({
         senderPrivateKeyHex: privateKey.trim(),
         restUrl: restEndpoint,
         networkId,
-        data
+        data: payload
       });
 
       const explorerUrl = getExplorerTxUrl(networkId, result.hash);
@@ -257,12 +352,15 @@ export default function AptosToolPage() {
     }
   };
 
+  const isSubmitting = submission.status === 'submitting';
+  const disableSubmit = isSubmitting || (submissionMode === 'wallet' && !connected);
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Aptos 合约交互</h1>
         <p className="text-slate-300">
-          选择网络与模块后自动检索 ABI，针对每个函数参数提供原始值、Hex Vector 与 BCS Hex 三种输入模式，最后一键提交交易。
+          连接 Aptos 钱包或使用私钥签名，加载合约 ABI 后即可根据参数类型自动生成输入表单并构建交易。
         </p>
       </header>
 
@@ -482,48 +580,130 @@ export default function AptosToolPage() {
                 )}
               </div>
 
-              <div className="space-y-4">
-                <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-                  发送者私钥（Hex）
-                  <textarea
-                    className="min-h-[80px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                    placeholder="0x..."
-                    value={privateKey}
-                    onChange={(event) => setPrivateKey(event.target.value.trim())}
-                  />
-                </label>
-                <p className="text-xs text-slate-500">
-                  私钥仅用于当前浏览器内的签名请求，请确保在安全环境下使用。
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  className="w-full rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-                  disabled={submission.status === 'submitting'}
-                >
-                  {submission.status === 'submitting' ? '提交中...' : '提交交易'}
-                </button>
-                {submission.status === 'error' && submission.message ? (
-                  <p className="text-sm text-rose-400">{submission.message}</p>
-                ) : null}
-                {submission.status === 'success' && submission.hash ? (
-                  <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-200">
-                    <p>交易哈希：<span className="break-all text-sky-300">{submission.hash}</span></p>
-                    {submission.explorerUrl ? (
-                      <a
-                        className="inline-flex items-center text-sky-400 hover:text-sky-300"
-                        href={submission.explorerUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        在 Aptos Explorer 中查看
-                      </a>
-                    ) : null}
+              <div className="space-y-5">
+                <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+                  <h3 className="text-sm font-semibold text-slate-200">签名方式</h3>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionMode('wallet')}
+                      className={`rounded-full px-3 py-1 transition ${
+                        submissionMode === 'wallet' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      Aptos 钱包
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSubmissionMode('privateKey')}
+                      className={`rounded-full px-3 py-1 transition ${
+                        submissionMode === 'privateKey'
+                          ? 'bg-sky-500/30 text-sky-200'
+                          : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      }`}
+                    >
+                      私钥签名
+                    </button>
                   </div>
-                ) : null}
+
+                  {submissionMode === 'wallet' ? (
+                    <div className="space-y-3 text-sm text-slate-200">
+                      {connected && activeWallet ? (
+                        <div className="flex flex-col gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-4 py-3">
+                          <div className="flex items-center justify-between text-xs text-slate-300">
+                            <span className="font-medium text-slate-100">已连接钱包</span>
+                            <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[11px] text-sky-200">{activeWallet.name}</span>
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            地址：<span className="text-sky-300">{truncateAddress(walletAddress)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-400">
+                            <span>钱包网络：{walletNetwork?.name ?? '未知'}</span>
+                            <button
+                              type="button"
+                              onClick={handleWalletDisconnect}
+                              className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-rose-600 hover:text-rose-300"
+                            >
+                              断开连接
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-xs text-slate-400">选择已安装的钱包进行连接（当前已集成 Aptos Wallet Adapter React）。</p>
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {availableWallets.length > 0 ? (
+                              availableWallets.map((item) => (
+                                <button
+                                  key={item.name}
+                                  type="button"
+                                  onClick={() => handleWalletConnect(item.name)}
+                                  className="flex flex-col items-start gap-1 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-left text-xs text-slate-300 transition hover:border-sky-500/60 hover:text-sky-200"
+                                >
+                                  <span className="text-sm font-medium text-slate-100">{item.name}</span>
+                                  <span className="text-xs text-slate-500">状态：{item.readyState}</span>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-xs text-slate-400">
+                                未检测到兼容钱包，请先安装 Petra 等 Aptos 钱包插件。
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {walletFeedback ? <p className="text-xs text-rose-400">{walletFeedback}</p> : null}
+                      {networkMismatch ? (
+                        <p className="text-xs text-amber-400">
+                          当前钱包网络为 {walletNetwork?.name ?? '未知'}，与工具选择的 {networkId} 不一致，提交后可能失败，请确认。
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
+                        发送者私钥（Hex）
+                        <textarea
+                          className="min-h-[80px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
+                          placeholder="0x..."
+                          value={privateKey}
+                          onChange={(event) => setPrivateKey(event.target.value)}
+                        />
+                      </label>
+                      <p className="text-xs text-slate-500">私钥仅用于当前浏览器内的签名请求，请确保在安全环境下使用。</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="w-full rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+                    disabled={disableSubmit}
+                  >
+                    {isSubmitting ? '提交中...' : '提交交易'}
+                  </button>
+                  {submission.status === 'error' && submission.message ? (
+                    <p className="text-sm text-rose-400">{submission.message}</p>
+                  ) : null}
+                  {submission.status === 'success' && submission.hash ? (
+                    <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-200">
+                      <p>交易哈希：<span className="break-all text-sky-300">{submission.hash}</span></p>
+                      {submission.explorerUrl ? (
+                        <a
+                          className="inline-flex items-center text-sky-400 hover:text-sky-300"
+                          href={submission.explorerUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          在 Aptos Explorer 中查看
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           )}

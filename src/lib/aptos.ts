@@ -95,3 +95,9 @@ export function getExplorerTxUrl(networkId: SubmitEntryFunctionParams['networkId
       return null;
   }
 }
+
+export async function waitForTransaction(restUrl: string, hash: string) {
+  const config = new AptosConfig({ fullnode: restUrl });
+  const aptos = new Aptos(config);
+  return aptos.waitForTransaction({ transactionHash: ensureHexPrefix(hash) });
+}
