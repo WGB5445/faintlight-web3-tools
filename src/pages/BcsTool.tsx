@@ -118,12 +118,14 @@ export default function BcsToolPage() {
       case 'vector<u8>':
         return (
           <div className="space-y-3">
-            <div className="flex gap-2 text-xs">
+            <div className="flex gap-2 text-sm">
               <button
                 type="button"
                 onClick={() => setVectorMode('text')}
-                className={`rounded-full px-3 py-1 ${
-                  vectorMode === 'text' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                className={`rounded-lg border px-3 py-2 font-medium transition ${
+                  vectorMode === 'text'
+                    ? 'border-sky-500 bg-sky-500/20 text-sky-100 shadow-sm shadow-sky-500/20'
+                    : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600 hover:text-sky-200'
                 }`}
               >
                 {t('bcs.encode.vectorModeText')}
@@ -131,8 +133,10 @@ export default function BcsToolPage() {
               <button
                 type="button"
                 onClick={() => setVectorMode('hex')}
-                className={`rounded-full px-3 py-1 ${
-                  vectorMode === 'hex' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                className={`rounded-lg border px-3 py-2 font-medium transition ${
+                  vectorMode === 'hex'
+                    ? 'border-sky-500 bg-sky-500/20 text-sky-100 shadow-sm shadow-sky-500/20'
+                    : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600 hover:text-sky-200'
                 }`}
               >
                 {t('bcs.encode.vectorModeHex')}
@@ -193,15 +197,17 @@ export default function BcsToolPage() {
       </header>
 
       <section className="space-y-6">
-        <div className="flex flex-wrap gap-3 text-xs">
+        <div className="flex flex-wrap gap-3 text-sm">
           <button
             type="button"
             onClick={() => {
               setMode('encode');
               resetOutputs();
             }}
-            className={`rounded-full px-3 py-1 transition ${
-              mode === 'encode' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            className={`rounded-lg border px-4 py-2 font-medium transition ${
+              mode === 'encode'
+                ? 'border-sky-500 bg-sky-500/20 text-sky-100 shadow-sm shadow-sky-500/20'
+                : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600 hover:text-sky-200'
             }`}
           >
             {t('bcs.mode.encode')}
@@ -212,8 +218,10 @@ export default function BcsToolPage() {
               setMode('decode');
               resetOutputs();
             }}
-            className={`rounded-full px-3 py-1 transition ${
-              mode === 'decode' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            className={`rounded-lg border px-4 py-2 font-medium transition ${
+              mode === 'decode'
+                ? 'border-sky-500 bg-sky-500/20 text-sky-100 shadow-sm shadow-sky-500/20'
+                : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:border-slate-600 hover:text-sky-200'
             }`}
           >
             {t('bcs.mode.decode')}

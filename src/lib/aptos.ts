@@ -82,18 +82,43 @@ function ensureHexPrefix(hash: string) {
   return hash.startsWith('0x') ? hash : `0x${hash}`;
 }
 
-export function getExplorerTxUrl(networkId: SubmitEntryFunctionParams['networkId'], hash: string) {
+const EXPLORER_BASE_BY_NETWORK: Record<string, string> = {
+  mainnet: 'https://explorer.aptoslabs.com/txn/',
+  testnet: 'https://explorer.aptoslabs.com/txn/',
+  devnet: 'https://explorer.aptoslabs.com/txn/'
+};
+
+const EXPLORER_QUERY_BY_NETWORK: Record<string, string> = {
+  mainnet: '?network=mainnet',
+  testnet: '?network=testnet',
+  devnet: '?network=devnet'
+};
+
+export function getExplorerTxUrl({
+  preferredNetwork,
+  fallbackNetwork,
+  hash
+}: {
+  preferredNetwork?: string | null;
+  fallbackNetwork: SubmitEntryFunctionParams['networkId'];
+  hash: string;
+}) {
   const normalizedHash = ensureHexPrefix(hash);
-  switch (networkId) {
-    case 'mainnet':
-      return `https://explorer.aptoslabs.com/txn/${normalizedHash}?network=mainnet`;
-    case 'testnet':
-      return `https://explorer.aptoslabs.com/txn/${normalizedHash}?network=testnet`;
-    case 'devnet':
-      return `https://explorer.aptoslabs.com/txn/${normalizedHash}?network=devnet`;
-    default:
-      return null;
+
+  const primary = preferredNetwork?.toLowerCase();
+  const primaryBase = primary ? EXPLORER_BASE_BY_NETWORK[primary] : undefined;
+  const primaryQuery = primary ? EXPLORER_QUERY_BY_NETWORK[primary] : undefined;
+
+  if (primaryBase) {
+    return `${primaryBase}${normalizedHash}${primaryQuery ?? ''}`;
   }
+
+  const fallbackKey = fallbackNetwork !== 'custom' ? fallbackNetwork : 'mainnet';
+  const fallbackBase = EXPLORER_BASE_BY_NETWORK[fallbackKey];
+  const fallbackQuery = EXPLORER_QUERY_BY_NETWORK[fallbackKey];
+
+  if (!fallbackBase) return null;
+  return `${fallbackBase}${normalizedHash}${fallbackQuery ?? ''}`;
 }
 
 export async function waitForTransaction(restUrl: string, hash: string) {

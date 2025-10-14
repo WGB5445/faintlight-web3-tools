@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useWallet, WalletReadyState } from '@aptos-labs/wallet-adapter-react';
+import { useWallet } from '@aptos-labs/wallet-adapter-react';
 import type { InputEntryFunctionData } from '@aptos-labs/ts-sdk';
 
 import { APTOS_NETWORKS, resolveRestEndpoint } from '../lib/networks';
@@ -7,11 +7,10 @@ import { fetchModuleAbi, getExplorerTxUrl, MoveModuleAbi, submitEntryFunction, w
 import { getTypeLabel, simplifyType, SimpleTypeTag } from '../lib/abi';
 import { decodePrimitive, hexToBytes, toPrimitiveType } from '../lib/bcs';
 import { useLanguage } from '../context/LanguageContext';
+import { truncateAddress } from '../lib/address';
 
 type ArgMode = 'raw' | 'hex' | 'bcs';
 type SubmissionMode = 'wallet' | 'privateKey';
-
-type WalletItem = ReturnType<typeof useWallet>['wallets'][number];
 
 interface ArgState {
   mode: ArgMode;
@@ -37,11 +36,6 @@ function createInitialArgs(params: string[]): ArgState[] {
   return params.map(() => ({ mode: 'raw', rawValue: '', hexValue: '', bcsValue: '' }));
 }
 
-function truncateAddress(address: string) {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
 function extractTxnHash(value: unknown): string {
   if (!value) return '';
   if (typeof value === 'string') return value;
@@ -50,10 +44,6 @@ function extractTxnHash(value: unknown): string {
     if (typeof hash === 'string') return hash;
   }
   return '';
-}
-
-function isWalletSelectable(wallet: WalletItem) {
-  return wallet.readyState === WalletReadyState.Installed || wallet.readyState === WalletReadyState.Loadable;
 }
 
 export default function AptosToolPage() {
@@ -69,16 +59,11 @@ export default function AptosToolPage() {
   const [typeArgValues, setTypeArgValues] = useState<string[]>([]);
   const [argStates, setArgStates] = useState<ArgState[]>([]);
   const [privateKey, setPrivateKey] = useState('');
-  const [walletFeedback, setWalletFeedback] = useState<string | null>(null);
   const [submission, setSubmission] = useState<SubmissionState>({ status: 'idle' });
 
-  const wallet = useWallet();
-  const { wallets, connect, disconnect, connected, account, wallet: activeWallet, network: walletNetwork, signAndSubmitTransaction } = wallet;
+  const { connected, account, wallet: activeWallet, network: walletNetwork, signAndSubmitTransaction } = useWallet();
 
   const restEndpoint = useMemo(() => resolveRestEndpoint(networkId, customEndpoint), [networkId, customEndpoint]);
-
-  const availableWallets = useMemo(() => wallets.filter(isWalletSelectable), [wallets]);
-  const walletAddress = account?.address ?? '';
   const normalizedWalletNetwork = walletNetwork?.name ? walletNetwork.name.toLowerCase() : null;
   const networkMismatch =
     submissionMode === 'wallet' && normalizedWalletNetwork && networkId !== 'custom' && normalizedWalletNetwork !== networkId;
@@ -266,24 +251,6 @@ export default function AptosToolPage() {
     return outputs;
   }, [argStates, convertBcsValue, convertHexValue, convertRawValue, parameterTypes, t]);
 
-  const handleWalletConnect = async (walletName: string) => {
-    try {
-      setWalletFeedback(null);
-      await connect(walletName);
-    } catch (error) {
-      setWalletFeedback(error instanceof Error ? error.message : String(error));
-    }
-  };
-
-  const handleWalletDisconnect = async () => {
-    try {
-      await disconnect();
-      setWalletFeedback(null);
-    } catch (error) {
-      setWalletFeedback(error instanceof Error ? error.message : String(error));
-    }
-  };
-
   const handleSubmit = async () => {
     if (!selectedFn || !moduleAbi) return;
 
@@ -335,7 +302,11 @@ export default function AptosToolPage() {
           }
         }
 
-        const explorerUrl = getExplorerTxUrl(networkId, hash);
+        const explorerUrl = getExplorerTxUrl({
+          preferredNetwork: walletNetwork?.name ?? null,
+          fallbackNetwork: networkId,
+          hash
+        });
         setSubmission({ status: 'success', hash, explorerUrl, message: t('aptos.submission.success') });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -358,7 +329,11 @@ export default function AptosToolPage() {
         data: payload
       });
 
-      const explorerUrl = getExplorerTxUrl(networkId, result.hash);
+      const explorerUrl = getExplorerTxUrl({
+        preferredNetwork: null,
+        fallbackNetwork: networkId,
+        hash: result.hash
+      });
       setSubmission({ status: 'success', hash: result.hash, explorerUrl, message: t('aptos.submission.success') });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -625,53 +600,14 @@ export default function AptosToolPage() {
                   {submissionMode === 'wallet' ? (
                     <div className="space-y-3 text-sm text-slate-200">
                       {connected && activeWallet ? (
-                        <div className="flex flex-col gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-4 py-3">
-                          <div className="flex items-center justify-between text-xs text-slate-300">
-                            <span className="font-medium text-slate-100">{t('aptos.signing.walletConnectedTitle')}</span>
-                            <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[11px] text-sky-200">{activeWallet.name}</span>
-                          </div>
-                          <div className="text-xs text-slate-400">
-                            {t('aptos.signing.walletAddress')}：<span className="text-sky-300">{truncateAddress(walletAddress)}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>
-                              {t('aptos.signing.walletNetwork')}：{walletNetworkLabel}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={handleWalletDisconnect}
-                              className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-rose-600 hover:text-rose-300"
-                            >
-                              {t('common.actions.disconnect')}
-                            </button>
-                          </div>
+                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900/60 px-3 py-1 text-xs text-slate-300">
+                          <span className="font-semibold text-slate-100">{activeWallet.name}</span>
+                          <span className="text-slate-500">{truncateAddress(account?.address)}</span>
+                          <span className="text-slate-600">/ {walletNetworkLabel}</span>
                         </div>
                       ) : (
-                        <div className="space-y-3">
-                          <p className="text-xs text-slate-400">{t('aptos.signing.connectPrompt')}</p>
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {availableWallets.length > 0 ? (
-                              availableWallets.map((item) => (
-                                <button
-                                  key={item.name}
-                                  type="button"
-                                  onClick={() => handleWalletConnect(item.name)}
-                                  className="flex flex-col items-start gap-1 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-left text-xs text-slate-300 transition hover:border-sky-500/60 hover:text-sky-200"
-                                >
-                                  <span className="text-sm font-medium text-slate-100">{item.name}</span>
-                                  <span className="text-xs text-slate-500">{t('aptos.signing.statusLabel', { status: item.readyState })}</span>
-                                </button>
-                              ))
-                            ) : (
-                              <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-xs text-slate-400">
-                                {t('aptos.signing.notDetected')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                        <p className="text-xs text-slate-400">{t('aptos.signing.reminderConnectAbove')}</p>
                       )}
-
-                      {walletFeedback ? <p className="text-xs text-rose-400">{walletFeedback}</p> : null}
                       {networkMismatch ? (
                         <p className="text-xs text-amber-400">
                           {t('aptos.signing.networkMismatch', {

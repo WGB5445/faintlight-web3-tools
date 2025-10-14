@@ -36,3 +36,15 @@ export function resolveRestEndpoint(id: AptosNetworkOption['id'], customEndpoint
   const found = APTOS_NETWORKS.find((item) => item.id === id);
   return found?.restUrl ?? '';
 }
+
+const REST_URL_BY_NAME: Record<string, string> = {
+  mainnet: 'https://fullnode.mainnet.aptoslabs.com/v1',
+  testnet: 'https://fullnode.testnet.aptoslabs.com/v1',
+  devnet: 'https://fullnode.devnet.aptoslabs.com/v1'
+};
+
+export function defaultRestUrlForWallet(networkName?: string | null) {
+  if (!networkName) return null;
+  const key = networkName.toLowerCase();
+  return REST_URL_BY_NAME[key] ?? null;
+}

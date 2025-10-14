@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import LanguageLayout from './components/layout/LanguageLayout';
 import AppShell from './components/layout/AppShell';
 import PreferredLanguageRedirect from './components/navigation/PreferredLanguageRedirect';
+import AptosLayout from './components/layout/AptosLayout';
 import HomePage from './pages/Home';
 import AptosToolPage from './pages/AptosTool';
 import BcsToolPage from './pages/BcsTool';
@@ -24,8 +25,12 @@ export default function App() {
       <Route path="/:lang" element={<LanguageLayout />}>
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
-          <Route path="aptos" element={<AptosToolPage />} />
-          <Route path="bcs" element={<BcsToolPage />} />
+          <Route path="aptos" element={<AptosLayout />}>
+            <Route index element={<Navigate to="contract-interaction" replace />} />
+            <Route path="contract-interaction" element={<AptosToolPage />} />
+            <Route path="bcs-tools" element={<BcsToolPage />} />
+          </Route>
+          <Route path="bcs" element={<Navigate to="aptos/bcs-tools" replace />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

@@ -30,12 +30,12 @@ export const TOOL_GROUPS: ToolGroup[] = [
     hintKey: 'navigation.groups.aptos.hint',
     items: [
       {
-        slug: 'aptos',
+        slug: 'aptos/contract-interaction',
         labelKey: 'navigation.tools.aptosInteraction.label',
         descriptionKey: 'navigation.tools.aptosInteraction.description'
       },
       {
-        slug: 'bcs',
+        slug: 'aptos/bcs-tools',
         labelKey: 'navigation.tools.aptosBcs.label',
         descriptionKey: 'navigation.tools.aptosBcs.description'
       }

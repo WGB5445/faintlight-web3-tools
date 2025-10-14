@@ -1,7 +1,12 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { findToolBySlug, TOOL_GROUPS } from '../../lib/tools';
 import { useLanguage } from '../../context/LanguageContext';
 import LanguageSwitcher from '../navigation/LanguageSwitcher';
+
+export type AppShellOutletContext = {
+  setHeaderAccessory: (node: ReactNode | null) => void;
+};
 
 function sidebarLinkClass({ isActive }: { isActive: boolean }) {
   return [
@@ -29,6 +34,21 @@ export default function AppShell() {
   const { lang, t, buildPath } = useLanguage();
   const activeSlug = extractSlug(location.pathname, lang);
   const activeContext = findToolBySlug(activeSlug);
+  const [headerAccessory, setHeaderAccessory] = useState<ReactNode | null>(null);
+
+  const handleSetHeaderAccessory = useCallback((node: ReactNode | null) => {
+    setHeaderAccessory(node);
+  }, []);
+
+  useEffect(() => {
+    return () => setHeaderAccessory(null);
+  }, []);
+
+  useEffect(() => {
+    if (activeContext?.group.id !== 'aptos' && headerAccessory) {
+      setHeaderAccessory(null);
+    }
+  }, [activeContext?.group.id, headerAccessory]);
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -44,12 +64,15 @@ export default function AppShell() {
               <p className="max-w-2xl text-sm text-slate-400">{t('layout.subtitle')}</p>
             </div>
             {activeContext ? (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-2 text-xs text-slate-400">
-                <span className="text-slate-500">{t('layout.status.chain')}：</span>
-                <span className="text-sky-300">{t(activeContext.group.titleKey)}</span>
-                <span className="px-2 text-slate-600">|</span>
-                <span className="text-slate-500">{t('layout.status.tool')}：</span>
-                <span className="text-slate-200">{t(activeContext.item.labelKey)}</span>
+              <div className="flex w-full min-h-[48px] flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-2 text-xs text-slate-400 md:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-slate-500">{t('layout.status.chain')}：</span>
+                  <span className="text-sky-300">{t(activeContext.group.titleKey)}</span>
+                  <span className="px-2 text-slate-600">|</span>
+                  <span className="text-slate-500">{t('layout.status.tool')}：</span>
+                  <span className="text-slate-200">{t(activeContext.item.labelKey)}</span>
+                </div>
+                {headerAccessory ? <div className="ml-auto flex items-center text-left">{headerAccessory}</div> : null}
               </div>
             ) : null}
           </div>
@@ -85,7 +108,7 @@ export default function AppShell() {
           </aside>
 
           <main className="min-h-[60vh] flex-1 rounded-2xl border border-slate-800 bg-slate-900/40 p-8 shadow-xl shadow-sky-950/20">
-            <Outlet />
+            <Outlet context={{ setHeaderAccessory: handleSetHeaderAccessory }} />
           </main>
         </div>
 
