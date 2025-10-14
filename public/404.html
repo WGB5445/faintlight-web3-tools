@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Redirecting…</title>
+    <meta http-equiv="refresh" content="0;url=/faintlight-web3-tools/" />
+    <script>
+      (function(l) {
+        var pathSegmentsToKeep = 1;
+        var segments = l.pathname.replace(/^\/+/g, '').split('/');
+        var keptSegments = segments.slice(0, pathSegmentsToKeep).filter(Boolean);
+        var remainder = segments.slice(pathSegmentsToKeep).join('/');
+        var basePath = keptSegments.length ? '/' + keptSegments.join('/') + '/' : '/';
+        var targetPath = basePath + '?p=/';
+        if (remainder) {
+          targetPath += remainder;
+        }
+        var search = l.search ? '&q=' + encodeURIComponent(l.search.slice(1)) : '';
+        var hash = l.hash || '';
+        l.replace(targetPath + search + hash);
+      })(window.location);
+    </script>
+  </head>
+  <body>
+    Redirecting…
+  </body>
+</html>

@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Faintlight Web3 Tools</title>
+    <script>
+      (function(l) {
+        if (!l.search) return;
+        var params = new URLSearchParams(l.search.slice(1));
+        var redirectPath = params.get('p');
+        if (!redirectPath) return;
+        var query = params.get('q');
+        var hash = l.hash;
+        var target = redirectPath;
+        if (query) {
+          target += '?' + query;
+        }
+        if (hash) {
+          target += hash;
+        }
+        window.history.replaceState(null, '', target);
+      })(window.location);
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-100">
     <div id="root"></div>

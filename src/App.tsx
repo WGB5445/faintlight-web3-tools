@@ -1,12 +1,22 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LanguageLayout from './components/layout/LanguageLayout';
 import AppShell from './components/layout/AppShell';
 import PreferredLanguageRedirect from './components/navigation/PreferredLanguageRedirect';
-import AptosLayout from './components/layout/AptosLayout';
 import HomePage from './pages/Home';
-import AptosToolPage from './pages/AptosTool';
-import BcsToolPage from './pages/BcsTool';
 import { useLanguage } from './context/LanguageContext';
+
+const AptosLayout = lazy(() => import('./components/layout/AptosLayout'));
+const AptosToolPage = lazy(() => import('./pages/AptosTool'));
+const BcsToolPage = lazy(() => import('./pages/BcsTool'));
+
+function RouteLoader() {
+  return (
+    <div className="flex h-full items-center justify-center px-6 py-10 text-sm text-slate-400">
+      Loading…
+    </div>
+  );
+}
 
 function NotFoundPage() {
   const { t } = useLanguage();
@@ -25,10 +35,31 @@ export default function App() {
       <Route path="/:lang" element={<LanguageLayout />}>
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
-          <Route path="aptos" element={<AptosLayout />}>
+          <Route
+            path="aptos"
+            element={
+              <Suspense fallback={<RouteLoader />}>
+                <AptosLayout />
+              </Suspense>
+            }
+          >
             <Route index element={<Navigate to="contract-interaction" replace />} />
-            <Route path="contract-interaction" element={<AptosToolPage />} />
-            <Route path="bcs-tools" element={<BcsToolPage />} />
+            <Route
+              path="contract-interaction"
+              element={
+                <Suspense fallback={<RouteLoader />}>
+                  <AptosToolPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="bcs-tools"
+              element={
+                <Suspense fallback={<RouteLoader />}>
+                  <BcsToolPage />
+                </Suspense>
+              }
+            />
           </Route>
           <Route path="bcs" element={<Navigate to="aptos/bcs-tools" replace />} />
           <Route path="*" element={<NotFoundPage />} />
