@@ -17,7 +17,7 @@ export type EncodeInput = string | number | bigint | boolean | Uint8Array;
 export function hexToBytes(hex: string): Uint8Array {
   const normalized = hex.toLowerCase().startsWith('0x') ? hex.slice(2) : hex;
   if (normalized.length % 2 !== 0) {
-    throw new Error('Hex 字符串长度必须是偶数');
+    throw new Error('Hex string length must be even');
   }
   const bytes = new Uint8Array(normalized.length / 2);
   for (let i = 0; i < normalized.length; i += 2) {
@@ -75,7 +75,7 @@ function decodeULEB128(bytes: Uint8Array, offset = 0) {
     }
     shift += 7n;
   }
-  throw new Error('ULEB128 数据不完整');
+  throw new Error('Incomplete ULEB128 data');
 }
 
 function ensureUint(value: EncodeInput): bigint {
@@ -91,7 +91,7 @@ function ensureUint(value: EncodeInput): bigint {
     }
     return BigInt(value);
   }
-  throw new Error('无效的数字输入');
+  throw new Error('Invalid numeric input');
 }
 
 export function encodePrimitive(type: PrimitiveBcsType, value: EncodeInput): Uint8Array {
@@ -114,7 +114,7 @@ export function encodePrimitive(type: PrimitiveBcsType, value: EncodeInput): Uin
       const normalized = normalizeHexAddress(String(value));
       const raw = hexToBytes(normalized);
       if (raw.length > 32) {
-        throw new Error('地址长度超过 32 字节');
+        throw new Error('Address length exceeds 32 bytes');
       }
       const padded = new Uint8Array(32);
       padded.set(raw, 32 - raw.length);
@@ -136,7 +136,7 @@ export function encodePrimitive(type: PrimitiveBcsType, value: EncodeInput): Uin
       } else if (typeof value === 'string') {
         bytes = hexToBytes(value);
       } else {
-        throw new Error('vector<u8> 需要 hex 或 Uint8Array 输入');
+        throw new Error('vector<u8> requires hex or Uint8Array input');
       }
       const len = encodeULEB128(bytes.length);
       const out = new Uint8Array(len.length + bytes.length);
@@ -145,7 +145,7 @@ export function encodePrimitive(type: PrimitiveBcsType, value: EncodeInput): Uin
       return out;
     }
     default:
-      throw new Error(`暂不支持的 BCS 类型: ${type}`);
+      throw new Error(`Unsupported BCS type: ${type}`);
   }
 }
 
@@ -174,7 +174,7 @@ export function decodePrimitive(type: PrimitiveBcsType, bytes: Uint8Array) {
       return bytesToHex(slice);
     }
     default:
-      throw new Error(`暂不支持的 BCS 类型: ${type}`);
+      throw new Error(`Unsupported BCS type: ${type}`);
   }
 }
 

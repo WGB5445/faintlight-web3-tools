@@ -6,6 +6,7 @@ import { APTOS_NETWORKS, resolveRestEndpoint } from '../lib/networks';
 import { fetchModuleAbi, getExplorerTxUrl, MoveModuleAbi, submitEntryFunction, waitForTransaction } from '../lib/aptos';
 import { getTypeLabel, simplifyType, SimpleTypeTag } from '../lib/abi';
 import { decodePrimitive, hexToBytes, toPrimitiveType } from '../lib/bcs';
+import { useLanguage } from '../context/LanguageContext';
 
 type ArgMode = 'raw' | 'hex' | 'bcs';
 type SubmissionMode = 'wallet' | 'privateKey';
@@ -36,70 +37,6 @@ function createInitialArgs(params: string[]): ArgState[] {
   return params.map(() => ({ mode: 'raw', rawValue: '', hexValue: '', bcsValue: '' }));
 }
 
-function convertRawValue(tag: SimpleTypeTag, value: string) {
-  const trimmed = value.trim();
-  if (!trimmed && tag.kind !== 'string' && tag.kind !== 'vector') {
-    throw new Error('参数不能为空');
-  }
-  switch (tag.kind) {
-    case 'bool':
-      if (trimmed === 'true' || trimmed === '1') return true;
-      if (trimmed === 'false' || trimmed === '0') return false;
-      throw new Error('布尔值仅接受 true/false 或 1/0');
-    case 'u8':
-    case 'u16':
-    case 'u32':
-    case 'u64':
-    case 'u128':
-    case 'u256':
-      return trimmed;
-    case 'address':
-      return trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`;
-    case 'string':
-      return value;
-    case 'vector':
-      if (tag.inner.kind === 'u8') {
-        return new TextEncoder().encode(value);
-      }
-      throw new Error('暂不支持该 vector 类型的原始输入');
-    default:
-      throw new Error('暂不支持此类型的原始输入');
-  }
-}
-
-function convertHexValue(tag: SimpleTypeTag, value: string) {
-  if (!value.trim()) {
-    throw new Error('请填写 Hex 字符串');
-  }
-  if (tag.kind === 'string') {
-    const bytes = hexToBytes(value.trim());
-    return new TextDecoder().decode(bytes);
-  }
-  if (tag.kind === 'vector' && tag.inner.kind === 'u8') {
-    return hexToBytes(value.trim());
-  }
-  throw new Error('该类型不支持 Hex Vector 输入');
-}
-
-function convertBcsValue(tag: SimpleTypeTag, value: string) {
-  if (!value.trim()) throw new Error('请填写 BCS Hex 数据');
-  const primitive = toPrimitiveType(tag);
-  if (!primitive) {
-    throw new Error('暂未实现该类型的 BCS 解析');
-  }
-  const decoded = decodePrimitive(primitive, hexToBytes(value.trim()));
-  if (primitive.startsWith('u')) {
-    return decoded.toString();
-  }
-  if (primitive === 'bool' || primitive === 'string' || primitive === 'address') {
-    return decoded;
-  }
-  if (primitive === 'vector<u8>') {
-    return hexToBytes(decoded as string);
-  }
-  return decoded;
-}
-
 function truncateAddress(address: string) {
   if (address.length <= 12) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -120,6 +57,7 @@ function isWalletSelectable(wallet: WalletItem) {
 }
 
 export default function AptosToolPage() {
+  const { t } = useLanguage();
   const [networkId, setNetworkId] = useState<'mainnet' | 'testnet' | 'devnet' | 'custom'>('testnet');
   const [submissionMode, setSubmissionMode] = useState<SubmissionMode>('wallet');
   const [customEndpoint, setCustomEndpoint] = useState('');
@@ -170,13 +108,86 @@ export default function AptosToolPage() {
     setTypeArgValues(Array(selectedFn.generic_type_params.length).fill(''));
   }, [selectedFn, callableParams]);
 
+  const convertRawValue = useCallback(
+    (tag: SimpleTypeTag, value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed && tag.kind !== 'string' && tag.kind !== 'vector') {
+        throw new Error(t('aptos.errors.parameterEmpty'));
+      }
+      switch (tag.kind) {
+        case 'bool':
+          if (trimmed === 'true' || trimmed === '1') return true;
+          if (trimmed === 'false' || trimmed === '0') return false;
+          throw new Error(t('aptos.errors.bool'));
+        case 'u8':
+        case 'u16':
+        case 'u32':
+        case 'u64':
+        case 'u128':
+        case 'u256':
+          return trimmed;
+        case 'address':
+          return trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`;
+        case 'string':
+          return value;
+        case 'vector':
+          if (tag.inner.kind === 'u8') {
+            return new TextEncoder().encode(value);
+          }
+          throw new Error(t('aptos.errors.vectorUnsupported'));
+        default:
+          throw new Error(t('aptos.errors.vectorUnsupported'));
+      }
+    },
+    [t]
+  );
+
+  const convertHexValue = useCallback(
+    (tag: SimpleTypeTag, value: string) => {
+      if (!value.trim()) {
+        throw new Error(t('aptos.errors.hexRequired'));
+      }
+      if (tag.kind === 'string') {
+        const bytes = hexToBytes(value.trim());
+        return new TextDecoder().decode(bytes);
+      }
+      if (tag.kind === 'vector' && tag.inner.kind === 'u8') {
+        return hexToBytes(value.trim());
+      }
+      throw new Error(t('aptos.errors.hexUnsupported'));
+    },
+    [t]
+  );
+
+  const convertBcsValue = useCallback(
+    (tag: SimpleTypeTag, value: string) => {
+      if (!value.trim()) throw new Error(t('aptos.errors.bcsRequired'));
+      const primitive = toPrimitiveType(tag);
+      if (!primitive) {
+        throw new Error(t('aptos.errors.bcsUnsupported'));
+      }
+      const decoded = decodePrimitive(primitive, hexToBytes(value.trim()));
+      if (primitive.startsWith('u')) {
+        return decoded.toString();
+      }
+      if (primitive === 'bool' || primitive === 'string' || primitive === 'address') {
+        return decoded;
+      }
+      if (primitive === 'vector<u8>') {
+        return hexToBytes(decoded as string);
+      }
+      return decoded;
+    },
+    [t]
+  );
+
   const loadModule = useCallback(async () => {
     if (!restEndpoint) {
-      setModuleError('请先配置有效的节点地址');
+      setModuleError(t('aptos.module.errors.missingEndpoint'));
       return;
     }
     if (!moduleId.includes('::')) {
-      setModuleError('模块 ID 需要 address::module 格式');
+      setModuleError(t('aptos.module.errors.invalidFormat'));
       return;
     }
     setModuleLoading(true);
@@ -188,13 +199,14 @@ export default function AptosToolPage() {
       setSelectedFunction(firstEntry?.name ?? '');
       setSubmission({ status: 'idle' });
     } catch (error) {
-      setModuleError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      setModuleError(t('aptos.messages.abiLoadError', { message }));
       setModuleAbi(null);
       setSelectedFunction('');
     } finally {
       setModuleLoading(false);
     }
-  }, [moduleId, restEndpoint]);
+  }, [moduleId, restEndpoint, t]);
 
   const handleArgModeChange = (index: number, mode: ArgMode) => {
     setArgStates((prev) => {
@@ -212,13 +224,13 @@ export default function AptosToolPage() {
     });
   };
 
-  const buildArguments = () => {
+  const buildArguments = useCallback(() => {
     const outputs: unknown[] = [];
     const errors: Array<string | undefined> = [];
     argStates.forEach((state, index) => {
       const tag = parameterTypes[index];
       if (!tag) {
-        errors[index] = `缺少第 ${index + 1} 个参数的类型信息`;
+        errors[index] = t('aptos.errors.missingTypeInfo', { index: index + 1 });
         return;
       }
       try {
@@ -233,7 +245,7 @@ export default function AptosToolPage() {
             outputs[index] = convertBcsValue(tag, state.bcsValue);
             break;
           default:
-            errors[index] = '未知的参数模式';
+            errors[index] = t('aptos.errors.unknownMode');
         }
       } catch (error) {
         errors[index] = error instanceof Error ? error.message : String(error);
@@ -248,11 +260,11 @@ export default function AptosToolPage() {
           error: errors[idx]
         }))
       );
-      throw new Error('参数校验失败，请检查输入。');
+      throw new Error(t('common.messages.parameterValidationFailed'));
     }
 
     return outputs;
-  };
+  }, [argStates, convertBcsValue, convertHexValue, convertRawValue, parameterTypes, t]);
 
   const handleWalletConnect = async (walletName: string) => {
     try {
@@ -275,13 +287,15 @@ export default function AptosToolPage() {
   const handleSubmit = async () => {
     if (!selectedFn || !moduleAbi) return;
 
-    const trimmedTypeArgs = typeArgValues.map((item) => item.trim()).slice(0, selectedFn.generic_type_params.length);
+    const trimmedTypeArgs = typeArgValues
+      .map((item) => item.trim())
+      .slice(0, selectedFn.generic_type_params.length);
     if (trimmedTypeArgs.length !== selectedFn.generic_type_params.length) {
-      setSubmission({ status: 'error', message: '类型参数数量与 ABI 不匹配。' });
+      setSubmission({ status: 'error', message: t('aptos.submission.typeArgMismatch') });
       return;
     }
     if (trimmedTypeArgs.length > 0 && trimmedTypeArgs.some((value) => value.length === 0)) {
-      setSubmission({ status: 'error', message: '请补全所有类型参数。' });
+      setSubmission({ status: 'error', message: t('aptos.submission.typeArgMissing') });
       return;
     }
 
@@ -301,7 +315,7 @@ export default function AptosToolPage() {
 
     if (submissionMode === 'wallet') {
       if (!connected || !account) {
-        setSubmission({ status: 'error', message: '请先连接支持的 Aptos 钱包。' });
+        setSubmission({ status: 'error', message: t('aptos.submission.walletRequired') });
         return;
       }
       setSubmission({ status: 'submitting' });
@@ -309,7 +323,7 @@ export default function AptosToolPage() {
         const pending = await signAndSubmitTransaction({ sender: account.address, data: payload });
         const hash = extractTxnHash(pending);
         if (!hash) {
-          setSubmission({ status: 'error', message: '钱包未返回有效的交易哈希。' });
+          setSubmission({ status: 'error', message: t('aptos.submission.walletHashMissing') });
           return;
         }
 
@@ -317,12 +331,12 @@ export default function AptosToolPage() {
           try {
             await waitForTransaction(restEndpoint, hash);
           } catch (error) {
-            console.warn('等待交易确认失败:', error);
+            console.warn('Failed to await transaction execution', error);
           }
         }
 
         const explorerUrl = getExplorerTxUrl(networkId, hash);
-        setSubmission({ status: 'success', hash, explorerUrl });
+        setSubmission({ status: 'success', hash, explorerUrl, message: t('aptos.submission.success') });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setSubmission({ status: 'error', message });
@@ -331,7 +345,7 @@ export default function AptosToolPage() {
     }
 
     if (!privateKey.trim()) {
-      setSubmission({ status: 'error', message: '请输入发送者私钥（Hex）。' });
+      setSubmission({ status: 'error', message: t('aptos.submission.privateKeyMissing') });
       return;
     }
 
@@ -345,7 +359,7 @@ export default function AptosToolPage() {
       });
 
       const explorerUrl = getExplorerTxUrl(networkId, result.hash);
-      setSubmission({ status: 'success', hash: result.hash, explorerUrl });
+      setSubmission({ status: 'success', hash: result.hash, explorerUrl, message: t('aptos.submission.success') });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setSubmission({ status: 'error', message });
@@ -355,19 +369,19 @@ export default function AptosToolPage() {
   const isSubmitting = submission.status === 'submitting';
   const disableSubmit = isSubmitting || (submissionMode === 'wallet' && !connected);
 
+  const walletNetworkLabel = walletNetwork?.name ?? t('aptos.signing.unknownNetwork');
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Aptos 合约交互</h1>
-        <p className="text-slate-300">
-          连接 Aptos 钱包或使用私钥签名，加载合约 ABI 后即可根据参数类型自动生成输入表单并构建交易。
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">{t('aptos.title')}</h1>
+        <p className="text-slate-300">{t('aptos.description')}</p>
       </header>
 
       <section className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-            网络选择
+            {t('aptos.network.label')}
             <select
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
               value={networkId}
@@ -378,23 +392,23 @@ export default function AptosToolPage() {
                   {network.label}
                 </option>
               ))}
-              <option value="custom">自定义</option>
+              <option value="custom">{t('aptos.network.customOption')}</option>
             </select>
           </label>
 
           {networkId === 'custom' ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-              Fullnode URL
+              {t('aptos.network.customLabel')}
               <input
                 className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-                placeholder="https://your-fullnode/v1"
+                placeholder={t('aptos.network.customPlaceholder')}
                 value={customEndpoint}
                 onChange={(event) => setCustomEndpoint(event.target.value)}
               />
             </label>
           ) : (
             <div className="flex flex-col gap-2 text-sm text-slate-400">
-              <span className="font-medium text-slate-300">节点地址</span>
+              <span className="font-medium text-slate-300">{t('aptos.network.restLabel')}</span>
               <span className="truncate rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs">
                 {resolveRestEndpoint(networkId)}
               </span>
@@ -404,10 +418,10 @@ export default function AptosToolPage() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-            模块 ID
+            {t('aptos.module.label')}
             <input
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-              placeholder="0x1::coin"
+              placeholder={t('aptos.module.placeholder')}
               value={moduleId}
               onChange={(event) => setModuleId(event.target.value)}
             />
@@ -418,7 +432,7 @@ export default function AptosToolPage() {
             className="self-end rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
             disabled={moduleLoading}
           >
-            {moduleLoading ? '检索中...' : '加载 ABI'}
+            {moduleLoading ? t('aptos.module.loading') : t('aptos.module.load')}
           </button>
         </div>
         {moduleError ? <p className="text-sm text-rose-400">{moduleError}</p> : null}
@@ -427,9 +441,9 @@ export default function AptosToolPage() {
       {moduleAbi && (
         <section className="space-y-6">
           <div className="space-y-3">
-            <h2 className="text-xl font-semibold text-slate-100">函数选择</h2>
+            <h2 className="text-xl font-semibold text-slate-100">{t('aptos.functions.title')}</h2>
             {entryFunctions.length === 0 ? (
-              <p className="text-sm text-slate-400">该模块没有暴露 entry 函数。</p>
+              <p className="text-sm text-slate-400">{t('aptos.functions.empty')}</p>
             ) : (
               <select
                 className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
@@ -438,7 +452,10 @@ export default function AptosToolPage() {
               >
                 {entryFunctions.map((fn) => (
                   <option key={fn.name} value={fn.name}>
-                    {fn.name}({fn.params.filter((param) => !isSignerParameter(param)).length} params)
+                    {t('aptos.functions.optionLabel', {
+                      name: fn.name,
+                      count: fn.params.filter((param) => !isSignerParameter(param)).length
+                    })}
                   </option>
                 ))}
               </select>
@@ -449,13 +466,13 @@ export default function AptosToolPage() {
             <div className="space-y-8">
               {selectedFn.generic_type_params.length > 0 ? (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-slate-200">类型参数</h3>
+                  <h3 className="text-lg font-semibold text-slate-200">{t('aptos.typeArgs.title')}</h3>
                   {typeArgValues.map((value, index) => (
                     <label key={index} className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-                      T{index}
+                      {t('aptos.typeArgs.label', { index })}
                       <input
                         className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-                        placeholder="例如 0x1::coin::CoinInfo"
+                        placeholder={t('aptos.typeArgs.placeholder')}
                         value={value}
                         onChange={(event) =>
                           setTypeArgValues((prev) => {
@@ -467,20 +484,19 @@ export default function AptosToolPage() {
                       />
                     </label>
                   ))}
-                  <p className="text-xs text-slate-400">类型参数需要完整的结构体或原语描述，比如 <code>0x1::coin::CoinInfo&lt;0x1::aptos_coin::AptosCoin&gt;</code>。</p>
+                  <p className="text-xs text-slate-400">{t('aptos.typeArgs.hint')}</p>
                 </div>
               ) : null}
 
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-200">参数输入</h3>
+                <h3 className="text-lg font-semibold text-slate-200">{t('aptos.arguments.title')}</h3>
                 {callableParams.length === 0 ? (
-                  <p className="text-sm text-slate-400">该函数不需要额外参数。</p>
+                  <p className="text-sm text-slate-400">{t('aptos.arguments.none')}</p>
                 ) : (
                   <div className="space-y-6">
                     {callableParams.map((param, index) => {
                       const tag = parameterTypes[index];
                       const state = argStates[index];
-                      const label = `参数 ${index + 1}`;
                       const typeLabel = getTypeLabel(tag);
                       const primitive = toPrimitiveType(tag);
                       const supportsHex = tag.kind === 'string' || (tag.kind === 'vector' && tag.inner.kind === 'u8');
@@ -489,8 +505,8 @@ export default function AptosToolPage() {
                       return (
                         <div key={`${param}-${index}`} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
                           <div className="flex flex-col gap-2 text-sm text-slate-300">
-                            <span className="font-semibold text-slate-100">{label}</span>
-                            <span className="text-xs uppercase tracking-wide text-slate-500">类型：{typeLabel}</span>
+                            <span className="font-semibold text-slate-100">{t('aptos.arguments.label', { index: index + 1 })}</span>
+                            <span className="text-xs uppercase tracking-wide text-slate-500">{t('aptos.arguments.type', { type: typeLabel })}</span>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2 text-xs">
                             <button
@@ -502,7 +518,7 @@ export default function AptosToolPage() {
                                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                               }`}
                             >
-                              原始值
+                              {t('aptos.arguments.modes.raw')}
                             </button>
                             <button
                               type="button"
@@ -516,7 +532,7 @@ export default function AptosToolPage() {
                                       : 'bg-slate-800 text-slate-500 line-through'
                               }`}
                             >
-                              Hex Vector
+                              {t('aptos.arguments.modes.hex')}
                             </button>
                             <button
                               type="button"
@@ -530,7 +546,7 @@ export default function AptosToolPage() {
                                       : 'bg-slate-800 text-slate-500 line-through'
                               }`}
                             >
-                              BCS Hex
+                              {t('aptos.arguments.modes.bcs')}
                             </button>
                           </div>
 
@@ -538,12 +554,12 @@ export default function AptosToolPage() {
                             <div className="mt-4">
                               <textarea
                                 className="min-h-[90px] w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100"
-                                placeholder={tag.kind === 'string' ? '输入原始字符串' : '输入与类型匹配的值'}
+                                placeholder={tag.kind === 'string' ? t('aptos.arguments.placeholders.rawString') : t('aptos.arguments.placeholders.rawGeneric')}
                                 value={state.rawValue}
                                 onChange={(event) => handleArgValueChange(index, 'rawValue', event.target.value)}
                               />
                               {tag.kind === 'vector' && tag.inner.kind === 'u8' ? (
-                                <p className="mt-1 text-xs text-slate-500">原始模式会按 UTF-8 将文本转换为字节数组。</p>
+                                <p className="mt-1 text-xs text-slate-500">{t('aptos.arguments.hints.rawVector')}</p>
                               ) : null}
                             </div>
                           )}
@@ -552,11 +568,11 @@ export default function AptosToolPage() {
                             <div className="mt-4">
                               <textarea
                                 className="min-h-[90px] w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100"
-                                placeholder="0x..."
+                                placeholder={t('aptos.arguments.placeholders.hex')}
                                 value={state.hexValue}
                                 onChange={(event) => handleArgValueChange(index, 'hexValue', event.target.value)}
                               />
-                              <p className="mt-1 text-xs text-slate-500">Hex Vector 会先转换为实际的字节或字符串。</p>
+                              <p className="mt-1 text-xs text-slate-500">{t('aptos.arguments.hints.hex')}</p>
                             </div>
                           )}
 
@@ -564,11 +580,11 @@ export default function AptosToolPage() {
                             <div className="mt-4">
                               <textarea
                                 className="min-h-[90px] w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100"
-                                placeholder="BCS 序列化后的 Hex"
+                                placeholder={t('aptos.arguments.placeholders.bcs')}
                                 value={state.bcsValue}
                                 onChange={(event) => handleArgValueChange(index, 'bcsValue', event.target.value)}
                               />
-                              <p className="mt-1 text-xs text-slate-500">系统会反序列化该 BCS 数据以生成最终参数。</p>
+                              <p className="mt-1 text-xs text-slate-500">{t('aptos.arguments.hints.bcs')}</p>
                             </div>
                           )}
 
@@ -582,7 +598,7 @@ export default function AptosToolPage() {
 
               <div className="space-y-5">
                 <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-                  <h3 className="text-sm font-semibold text-slate-200">签名方式</h3>
+                  <h3 className="text-sm font-semibold text-slate-200">{t('aptos.signing.title')}</h3>
                   <div className="flex flex-wrap gap-2 text-xs">
                     <button
                       type="button"
@@ -591,7 +607,7 @@ export default function AptosToolPage() {
                         submissionMode === 'wallet' ? 'bg-sky-500/30 text-sky-200' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      Aptos 钱包
+                      {t('aptos.signing.wallet')}
                     </button>
                     <button
                       type="button"
@@ -602,7 +618,7 @@ export default function AptosToolPage() {
                           : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                       }`}
                     >
-                      私钥签名
+                      {t('aptos.signing.privateKey')}
                     </button>
                   </div>
 
@@ -611,26 +627,28 @@ export default function AptosToolPage() {
                       {connected && activeWallet ? (
                         <div className="flex flex-col gap-2 rounded-lg border border-slate-800/80 bg-slate-950/60 px-4 py-3">
                           <div className="flex items-center justify-between text-xs text-slate-300">
-                            <span className="font-medium text-slate-100">已连接钱包</span>
+                            <span className="font-medium text-slate-100">{t('aptos.signing.walletConnectedTitle')}</span>
                             <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[11px] text-sky-200">{activeWallet.name}</span>
                           </div>
                           <div className="text-xs text-slate-400">
-                            地址：<span className="text-sky-300">{truncateAddress(walletAddress)}</span>
+                            {t('aptos.signing.walletAddress')}：<span className="text-sky-300">{truncateAddress(walletAddress)}</span>
                           </div>
                           <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span>钱包网络：{walletNetwork?.name ?? '未知'}</span>
+                            <span>
+                              {t('aptos.signing.walletNetwork')}：{walletNetworkLabel}
+                            </span>
                             <button
                               type="button"
                               onClick={handleWalletDisconnect}
                               className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 transition hover:border-rose-600 hover:text-rose-300"
                             >
-                              断开连接
+                              {t('common.actions.disconnect')}
                             </button>
                           </div>
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <p className="text-xs text-slate-400">选择已安装的钱包进行连接（当前已集成 Aptos Wallet Adapter React）。</p>
+                          <p className="text-xs text-slate-400">{t('aptos.signing.connectPrompt')}</p>
                           <div className="grid gap-2 sm:grid-cols-2">
                             {availableWallets.length > 0 ? (
                               availableWallets.map((item) => (
@@ -641,12 +659,12 @@ export default function AptosToolPage() {
                                   className="flex flex-col items-start gap-1 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-left text-xs text-slate-300 transition hover:border-sky-500/60 hover:text-sky-200"
                                 >
                                   <span className="text-sm font-medium text-slate-100">{item.name}</span>
-                                  <span className="text-xs text-slate-500">状态：{item.readyState}</span>
+                                  <span className="text-xs text-slate-500">{t('aptos.signing.statusLabel', { status: item.readyState })}</span>
                                 </button>
                               ))
                             ) : (
                               <div className="rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-3 text-xs text-slate-400">
-                                未检测到兼容钱包，请先安装 Petra 等 Aptos 钱包插件。
+                                {t('aptos.signing.notDetected')}
                               </div>
                             )}
                           </div>
@@ -656,22 +674,25 @@ export default function AptosToolPage() {
                       {walletFeedback ? <p className="text-xs text-rose-400">{walletFeedback}</p> : null}
                       {networkMismatch ? (
                         <p className="text-xs text-amber-400">
-                          当前钱包网络为 {walletNetwork?.name ?? '未知'}，与工具选择的 {networkId} 不一致，提交后可能失败，请确认。
+                          {t('aptos.signing.networkMismatch', {
+                            walletNetwork: walletNetworkLabel,
+                            selectedNetwork: networkId
+                          })}
                         </p>
                       ) : null}
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-                        发送者私钥（Hex）
+                        {t('aptos.privateKey.label')}
                         <textarea
                           className="min-h-[80px] rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100"
-                          placeholder="0x..."
+                          placeholder={t('aptos.privateKey.placeholder')}
                           value={privateKey}
                           onChange={(event) => setPrivateKey(event.target.value)}
                         />
                       </label>
-                      <p className="text-xs text-slate-500">私钥仅用于当前浏览器内的签名请求，请确保在安全环境下使用。</p>
+                      <p className="text-xs text-slate-500">{t('aptos.privateKey.hint')}</p>
                     </div>
                   )}
                 </div>
@@ -683,14 +704,17 @@ export default function AptosToolPage() {
                     className="w-full rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
                     disabled={disableSubmit}
                   >
-                    {isSubmitting ? '提交中...' : '提交交易'}
+                    {isSubmitting ? t('common.actions.submitting') : t('common.actions.submit')}
                   </button>
                   {submission.status === 'error' && submission.message ? (
                     <p className="text-sm text-rose-400">{submission.message}</p>
                   ) : null}
                   {submission.status === 'success' && submission.hash ? (
                     <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-200">
-                      <p>交易哈希：<span className="break-all text-sky-300">{submission.hash}</span></p>
+                      {submission.message ? <p className="text-slate-300">{submission.message}</p> : null}
+                      <p>
+                        {t('aptos.submission.hashLabel')}：<span className="break-all text-sky-300">{submission.hash}</span>
+                      </p>
                       {submission.explorerUrl ? (
                         <a
                           className="inline-flex items-center text-sky-400 hover:text-sky-300"
@@ -698,7 +722,7 @@ export default function AptosToolPage() {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          在 Aptos Explorer 中查看
+                          {t('common.actions.viewOnExplorer')}
                         </a>
                       ) : null}
                     </div>

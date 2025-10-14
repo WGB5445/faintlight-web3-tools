@@ -28,19 +28,19 @@ export type MoveModuleAbi = {
 export async function fetchModuleAbi(restUrl: string, moduleId: string): Promise<MoveModuleAbi> {
   const parsed = parseModuleId(moduleId);
   if (!parsed) {
-    throw new Error('模块 ID 需要使用 address::module 格式');
+    throw new Error('Module ID must use address::module format');
   }
 
   const url = `${restUrl.replace(/\/$/, '')}/accounts/${parsed.address}/module/${parsed.moduleName}`;
   const response = await fetch(url);
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`无法获取模块 ABI: ${response.status} ${detail}`);
+    throw new Error(`Failed to fetch module ABI: ${response.status} ${detail}`);
   }
   const json = await response.json();
 
   if (!json?.abi) {
-    throw new Error('返回数据缺少 ABI 信息');
+    throw new Error('Response missing ABI data');
   }
 
   return json.abi as MoveModuleAbi;

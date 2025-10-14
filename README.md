@@ -4,6 +4,7 @@
 
 - **Aptos 合约交互工具**：选择网络、自动拉取模块 ABI、动态生成函数输入表单，支持原始值 / Hex Vector / BCS Hex 三种参数输入模式，并可通过 Aptos Wallet Adapter 或私钥直接提交交易。
 - **BCS 编/解码工具**：归类于 Aptos 工具链，针对常见原语、地址与 `vector<u8>` 字节数组提供一键编码/解码，协助调试链上数据。
+- **多语言体验**：内置中英文文案，自动根据本地存储、URL 或系统语言选择默认语言，并在侧边栏提供切换控件。
 
 ## 快速开始
 
@@ -13,6 +14,7 @@ npm run dev
 ```
 
 - 默认开发服务器运行在 `http://localhost:5173`。
+- 页面路径统一使用 `/:lang/...` 结构（例如 `/en/aptos`、`/zh/bcs`），复制链接即可保留语言和工具上下文。
 - 所有依赖均已配置为最新稳定版本，可按需升级。
 
 ## 功能详情
@@ -41,19 +43,22 @@ npm run dev
 
 ## 目录结构
 
-- `src/pages/AptosTool.tsx`：Aptos 交易构建、钱包/私钥双模式提交主界面。
-- `src/pages/BcsTool.tsx`：BCS 工具页面（Aptos 工具分组内）。
+- `src/pages/AptosTool.tsx`：Aptos 交易构建、钱包/私钥双模式提交主界面（内置翻译）。
+- `src/pages/BcsTool.tsx`：BCS 工具页面（Aptos 工具分组内，含国际化文案）。
 - `src/lib/aptos.ts`：Aptos 网络访问和交易提交封装。
 - `src/lib/abi.ts`：ABI 解析与类型简化工具。
 - `src/lib/bcs.ts`：BCS 编/解码基础实现。
 - `src/lib/networks.ts`：网络配置与工具函数。
-- `src/lib/tools.ts`：链与工具分组配置。
+- `src/lib/tools.ts`：链与工具分组配置（含翻译 key）。
 - `src/context/WalletProvider.tsx`：Aptos Wallet Adapter React Provider 封装。
+- `src/context/LanguageContext.tsx` & `src/components/navigation/LanguageSwitcher.tsx`：语言上下文与切换器。
+- `src/components/layout/LanguageLayout.tsx`：基于 URL 参数的语言布局及首选项记忆。
 
 ## 后续扩展建议
 
 - 扩充钱包列表（Martian、Fewcha 等）或集成 WalletConnect 项目 ID，满足不同钱包生态。
 - 为复杂结构体/向量类型提供更智能的表单生成与模板。
 - 接入更多公链（如 Sui、EVM）并复用统一的表单渲染体系。
+- 追加更多语言包，或将翻译资源托管到远端配置中心以便动态更新。
 
 欢迎根据业务需求继续扩展！

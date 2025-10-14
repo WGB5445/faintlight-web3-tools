@@ -1,14 +1,18 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import LanguageLayout from './components/layout/LanguageLayout';
 import AppShell from './components/layout/AppShell';
+import PreferredLanguageRedirect from './components/navigation/PreferredLanguageRedirect';
 import HomePage from './pages/Home';
 import AptosToolPage from './pages/AptosTool';
 import BcsToolPage from './pages/BcsTool';
+import { useLanguage } from './context/LanguageContext';
 
 function NotFoundPage() {
+  const { t } = useLanguage();
   return (
     <div className="space-y-4 text-center">
-      <h2 className="text-2xl font-semibold text-slate-100">页面不存在</h2>
-      <p className="text-sm text-slate-400">请从顶部导航选择一个工具。</p>
+      <h2 className="text-2xl font-semibold text-slate-100">{t('notFound.title')}</h2>
+      <p className="text-sm text-slate-400">{t('notFound.message')}</p>
     </div>
   );
 }
@@ -16,12 +20,16 @@ function NotFoundPage() {
 export default function App() {
   return (
     <Routes>
-      <Route element={<AppShell />}>
-        <Route index element={<HomePage />} />
-        <Route path="aptos" element={<AptosToolPage />} />
-        <Route path="bcs" element={<BcsToolPage />} />
-        <Route path="*" element={<NotFoundPage />} />
+      <Route path="/" element={<PreferredLanguageRedirect />} />
+      <Route path="/:lang" element={<LanguageLayout />}>
+        <Route element={<AppShell />}>
+          <Route index element={<HomePage />} />
+          <Route path="aptos" element={<AptosToolPage />} />
+          <Route path="bcs" element={<BcsToolPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

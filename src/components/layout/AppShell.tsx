@@ -1,5 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { findToolByPath, TOOL_GROUPS } from '../../lib/tools';
+import { findToolBySlug, TOOL_GROUPS } from '../../lib/tools';
+import { useLanguage } from '../../context/LanguageContext';
+import LanguageSwitcher from '../navigation/LanguageSwitcher';
 
 function sidebarLinkClass({ isActive }: { isActive: boolean }) {
   return [
@@ -10,29 +12,44 @@ function sidebarLinkClass({ isActive }: { isActive: boolean }) {
   ].join(' ');
 }
 
+function extractSlug(pathname: string, lang: string) {
+  const prefix = `/${lang}`;
+  if (pathname === prefix) return '';
+  if (pathname.startsWith(`${prefix}/`)) {
+    return pathname.slice(prefix.length + 1);
+  }
+  if (pathname.startsWith(prefix)) {
+    return pathname.slice(prefix.length);
+  }
+  return pathname.replace(/^\//, '');
+}
+
 export default function AppShell() {
   const location = useLocation();
-  const activeContext = findToolByPath(location.pathname);
+  const { lang, t, buildPath } = useLanguage();
+  const activeSlug = extractSlug(location.pathname, lang);
+  const activeContext = findToolBySlug(activeSlug);
 
   return (
     <div className="min-h-screen bg-slate-950">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 pb-12 pt-10">
-        <header className="space-y-2">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Faintlight 工具箱</p>
-          <div className="flex flex-col gap-2 md:flex-row md:items-baseline md:justify-between">
+        <header className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{t('layout.badge')}</p>
+            <LanguageSwitcher />
+          </div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-baseline md:justify-between">
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold text-slate-100">Web3 多网络实验室</h1>
-              <p className="max-w-2xl text-sm text-slate-400">
-                以链路为维度组织工具，轻松扩展到 Aptos 之外的其他生态。左侧选择链与工具，右侧展示对应的交互界面。
-              </p>
+              <h1 className="text-3xl font-semibold text-slate-100">{t('layout.title')}</h1>
+              <p className="max-w-2xl text-sm text-slate-400">{t('layout.subtitle')}</p>
             </div>
             {activeContext ? (
               <div className="rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-2 text-xs text-slate-400">
-                <span className="text-slate-500">当前链：</span>
-                <span className="text-sky-300">{activeContext.group.label}</span>
+                <span className="text-slate-500">{t('layout.status.chain')}：</span>
+                <span className="text-sky-300">{t(activeContext.group.titleKey)}</span>
                 <span className="px-2 text-slate-600">|</span>
-                <span className="text-slate-500">工具：</span>
-                <span className="text-slate-200">{activeContext.item.label}</span>
+                <span className="text-slate-500">{t('layout.status.tool')}：</span>
+                <span className="text-slate-200">{t(activeContext.item.labelKey)}</span>
               </div>
             ) : null}
           </div>
@@ -44,15 +61,20 @@ export default function AppShell() {
               {TOOL_GROUPS.map((group) => (
                 <div key={group.id} className="space-y-3">
                   <div className="space-y-1">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">{group.label}</h2>
-                    {group.hint ? <p className="text-xs text-slate-500">{group.hint}</p> : null}
+                    <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">{t(group.titleKey)}</h2>
+                    {group.hintKey ? <p className="text-xs text-slate-500">{t(group.hintKey)}</p> : null}
                   </div>
                   <div className="space-y-2">
                     {group.items.map((item) => (
-                      <NavLink key={item.path} to={item.path} className={sidebarLinkClass} end>
-                        <span className="text-sm font-medium">{item.label}</span>
+                      <NavLink
+                        key={item.slug || 'root'}
+                        to={buildPath(item.slug)}
+                        className={sidebarLinkClass}
+                        end={item.slug === ''}
+                      >
+                        <span className="text-sm font-medium">{t(item.labelKey)}</span>
                         <span className="text-xs text-slate-400 transition group-hover:text-slate-300">
-                          {item.description}
+                          {t(item.descriptionKey)}
                         </span>
                       </NavLink>
                     ))}
@@ -68,9 +90,7 @@ export default function AppShell() {
         </div>
 
         <footer className="border-t border-slate-800 pt-6 text-xs text-slate-500">
-          <p>
-            需要扩展其他链？请在 <span className="text-sky-300">src/lib/tools.ts</span> 与相关页面中追加工具定义，即可无缝扩容。
-          </p>
+          <p>{t('layout.footer')}</p>
         </footer>
       </div>
     </div>

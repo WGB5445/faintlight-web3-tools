@@ -1,51 +1,51 @@
 export type ToolLink = {
-  path: string;
-  label: string;
-  description: string;
+  slug: string;
+  labelKey: string;
+  descriptionKey: string;
 };
 
 export type ToolGroup = {
   id: string;
-  label: string;
-  hint?: string;
+  titleKey: string;
+  hintKey?: string;
   items: ToolLink[];
 };
 
 export const TOOL_GROUPS: ToolGroup[] = [
   {
     id: 'overview',
-    label: '控制台',
-    hint: '整体介绍与使用说明',
+    titleKey: 'navigation.groups.overview.title',
+    hintKey: 'navigation.groups.overview.hint',
     items: [
       {
-        path: '/',
-        label: '工作台概览',
-        description: '总览当前所有可用工具与未来扩展方向。'
+        slug: '',
+        labelKey: 'navigation.tools.overview.label',
+        descriptionKey: 'navigation.tools.overview.description'
       }
     ]
   },
   {
     id: 'aptos',
-    label: 'Aptos',
-    hint: 'Aptos 链相关调试工具',
+    titleKey: 'navigation.groups.aptos.title',
+    hintKey: 'navigation.groups.aptos.hint',
     items: [
       {
-        path: '/aptos',
-        label: '合约交互',
-        description: '动态 ABI 表单与交易提交。'
+        slug: 'aptos',
+        labelKey: 'navigation.tools.aptosInteraction.label',
+        descriptionKey: 'navigation.tools.aptosInteraction.description'
       },
       {
-        path: '/bcs',
-        label: 'BCS 编/解码',
-        description: 'BCS 原语、地址与字节数组处理。'
+        slug: 'bcs',
+        labelKey: 'navigation.tools.aptosBcs.label',
+        descriptionKey: 'navigation.tools.aptosBcs.description'
       }
     ]
   }
 ];
 
-export function findToolByPath(pathname: string) {
+export function findToolBySlug(slug: string) {
   for (const group of TOOL_GROUPS) {
-    const item = group.items.find((entry) => pathname === entry.path);
+    const item = group.items.find((entry) => entry.slug === slug);
     if (item) {
       return { group, item };
     }
