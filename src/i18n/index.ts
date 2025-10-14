@@ -7,7 +7,17 @@ export type LanguageCode = (typeof SUPPORTED_LANGUAGES)[number];
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
 
-export type Messages = typeof en;
+type Localized<T> = T extends string
+  ? string
+  : T extends number | boolean | null | undefined
+  ? T
+  : T extends readonly (infer U)[]
+  ? readonly Localized<U>[]
+  : T extends (infer U)[]
+  ? Localized<U>[]
+  : { readonly [K in keyof T]: Localized<T[K]> };
+
+export type Messages = Localized<typeof en>;
 
 export const messages: Record<LanguageCode, Messages> = {
   en,

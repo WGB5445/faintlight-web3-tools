@@ -277,7 +277,7 @@ export default function AptosToolPage() {
     const payload: InputEntryFunctionData = {
       function: `${moduleAbi.address}::${moduleAbi.name}::${selectedFn.name}`,
       typeArguments: trimmedTypeArgs,
-      functionArguments: args
+      functionArguments: args as any[]
     };
 
     if (submissionMode === 'wallet') {
@@ -304,7 +304,7 @@ export default function AptosToolPage() {
 
         const explorerUrl = getExplorerTxUrl({
           preferredNetwork: walletNetwork?.name ?? null,
-          fallbackNetwork: networkId,
+          fallbackNetwork: networkId as 'mainnet' | 'testnet' | 'devnet' | 'custom',
           hash
         });
         setSubmission({ status: 'success', hash, explorerUrl, message: t('aptos.submission.success') });
@@ -344,7 +344,7 @@ export default function AptosToolPage() {
   const isSubmitting = submission.status === 'submitting';
   const disableSubmit = isSubmitting || (submissionMode === 'wallet' && !connected);
 
-  const walletNetworkLabel = walletNetwork?.name ?? t('aptos.signing.unknownNetwork');
+  const walletNetworkLabel = (walletNetwork?.name as string) ?? t('aptos.signing.unknownNetwork');
 
   return (
     <div className="space-y-8">

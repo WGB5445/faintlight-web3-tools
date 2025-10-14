@@ -10,7 +10,7 @@ import { defaultRestUrlForWallet } from '../../lib/networks';
 import AptosWalletButton from '../wallet/AptosWalletButton';
 
 function isSelectableWallet(wallet: ReturnType<typeof useWallet>['wallets'][number]) {
-  return wallet.readyState === WalletReadyState.Installed || wallet.readyState === WalletReadyState.Loadable;
+  return wallet.readyState === WalletReadyState.Installed;
 }
 
 function AptosHeaderAccessory() {
@@ -22,13 +22,13 @@ function AptosHeaderAccessory() {
     () =>
       wallets
         .filter(isSelectableWallet)
-        .map((item) => ({ name: item.name, readyState: item.readyState })),
+        .map((item) => ({ name: item.name, readyState: item.readyState ?? 'NotDetected' })),
     [wallets]
   );
 
   const address = normalizeAddress(account?.address);
-  const networkLabel = network?.name ?? t('aptos.signing.unknownNetwork');
-  const restUrl = defaultRestUrlForWallet(network?.name);
+  const networkLabel = (network?.name as string) ?? t('aptos.signing.unknownNetwork');
+  const restUrl = defaultRestUrlForWallet(network?.name ?? null);
 
   const accessory = useMemo(
     () => (
@@ -39,8 +39,12 @@ function AptosHeaderAccessory() {
         networkLabel={networkLabel}
         restUrl={restUrl}
         availableWallets={availableWallets}
-        onConnect={connect}
-        onDisconnect={disconnect}
+        onConnect={async (walletName: string) => {
+          await connect(walletName);
+        }}
+        onDisconnect={async () => {
+          await disconnect();
+        }}
       />
     ),
     [connected, wallet?.name, address, networkLabel, restUrl, availableWallets, connect, disconnect]

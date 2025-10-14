@@ -45,29 +45,29 @@ function applyVariables(value: string, vars?: TranslationVariables) {
 
 export function LanguageProvider({ lang, setLanguage, buildPath, children }: LanguageProviderProps) {
   const contextValue = useMemo<LanguageContextValue>(() => {
-    const translate: Translator = (key, vars) => {
+    const translate: Translator = <T = string>(key: string, vars?: TranslationVariables): T => {
       const resolved = resolveValue(key, lang);
       if (resolved === undefined) {
         console.warn(`Missing translation for key: ${key} (${lang})`);
-        return key as unknown;
+        return key as T;
       }
       if (typeof resolved === 'string') {
-        return applyVariables(resolved, vars) as unknown;
+        return applyVariables(resolved, vars) as T;
       }
       if (Array.isArray(resolved)) {
         if (!vars) {
-          return resolved as unknown;
+          return resolved as T;
         }
-        return resolved.map((item) => (typeof item === 'string' ? applyVariables(item, vars) : item)) as unknown;
+        return resolved.map((item) => (typeof item === 'string' ? applyVariables(item, vars) : item)) as T;
       }
       if (typeof resolved === 'object' && resolved !== null && vars) {
         const clone: Record<string, unknown> = {};
         for (const [keyName, value] of Object.entries(resolved)) {
           clone[keyName] = typeof value === 'string' ? applyVariables(value, vars) : value;
         }
-        return clone as unknown;
+        return clone as T;
       }
-      return resolved as unknown;
+      return resolved as T;
     };
 
     return {
