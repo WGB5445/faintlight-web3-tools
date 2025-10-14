@@ -6,18 +6,30 @@
     <meta http-equiv="refresh" content="0;url=/faintlight-web3-tools/" />
     <script>
       (function(l) {
-        var pathSegmentsToKeep = 1;
-        var segments = l.pathname.replace(/^\/+/g, '').split('/');
-        var keptSegments = segments.slice(0, pathSegmentsToKeep).filter(Boolean);
-        var remainder = segments.slice(pathSegmentsToKeep).join('/');
-        var basePath = keptSegments.length ? '/' + keptSegments.join('/') + '/' : '/';
-        var targetPath = basePath + '?p=/';
-        if (remainder) {
-          targetPath += remainder;
-        }
-        var search = l.search ? '&q=' + encodeURIComponent(l.search.slice(1)) : '';
+        var basePath = '/faintlight-web3-tools';
+        var pathname = l.pathname || '/';
+        var search = l.search || '';
         var hash = l.hash || '';
-        l.replace(targetPath + search + hash);
+
+        if (!pathname.startsWith(basePath)) {
+          basePath = '';
+        }
+
+        var remainder = pathname.slice(basePath.length) || '/';
+        if (!remainder.startsWith('/')) {
+          remainder = '/' + remainder;
+        }
+
+        try {
+          sessionStorage.setItem('spa-redirect:path', remainder);
+          sessionStorage.setItem('spa-redirect:search', search);
+          sessionStorage.setItem('spa-redirect:hash', hash);
+        } catch (error) {
+          console.warn('Failed to persist redirect data', error);
+        }
+
+        var target = basePath ? basePath + '/' : '/';
+        l.replace(target);
       })(window.location);
     </script>
   </head>
