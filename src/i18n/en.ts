@@ -123,7 +123,7 @@ const en = {
       hints: {
         rawVector: 'Raw mode encodes the supplied text as UTF-8 bytes.',
         hex: 'Hex input is converted into bytes or strings before submission.',
-        bcs: 'Provide BCS data that will be decoded into the final argument.'
+        bcs: 'Provide BCS hex. Known primitives decode automatically; other types send the serialized bytes as-is.'
       }
     },
     signing: {

@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useWallet } from '@aptos-labs/wallet-adapter-react';
-import type { InputEntryFunctionData } from '@aptos-labs/ts-sdk';
+import {  getAptosConfig, NetworkInfo, useWallet } from '@aptos-labs/wallet-adapter-react';
+import { AccountAddress, Bool, convertArgument, Deserializer, findFirstNonSignerArg, Hex, MoveOption, MoveString, parseTypeTag, Serialized, U128, U16, U256, U32, U64, U8 } from '@aptos-labs/ts-sdk';
+import type { FunctionABI, InputEntryFunctionData, MoveModule, MoveModuleBytecode, TypeTag, TypeTagVector } from '@aptos-labs/ts-sdk';
 
 import { APTOS_NETWORKS, resolveRestEndpoint } from '../lib/networks';
-import { fetchModuleAbi, getExplorerTxUrl, MoveModuleAbi, submitEntryFunction, waitForTransaction } from '../lib/aptos';
-import { getTypeLabel, simplifyType, SimpleTypeTag } from '../lib/abi';
-import { decodePrimitive, hexToBytes, toPrimitiveType } from '../lib/bcs';
+import { getExplorerTxUrl, getModule, resolveNetworkConfig, submitEntryFunction, waitForTransaction, decodeFromBytes, parseTypeTagLite, substituteGenerics, type TypeTag as CustomTypeTag } from '../lib/aptos';
 import { useLanguage } from '../context/LanguageContext';
 import { truncateAddress } from '../lib/address';
 
 type ArgMode = 'raw' | 'hex' | 'bcs';
 type SubmissionMode = 'wallet' | 'privateKey';
+
+// 转换 SDK 的 TypeTag 到自定义 TypeTag
+function convertTypeTag(sdkTag: TypeTag): CustomTypeTag {
+  // 使用 toString() 方法获取类型字符串，然后解析
+  const typeString = sdkTag.toString();
+  return parseTypeTagLite(typeString);
+}
 
 interface ArgState {
   mode: ArgMode;
@@ -54,7 +60,7 @@ export default function AptosToolPage() {
   const [moduleId, setModuleId] = useState('');
   const [moduleLoading, setModuleLoading] = useState(false);
   const [moduleError, setModuleError] = useState<string | null>(null);
-  const [moduleAbi, setModuleAbi] = useState<MoveModuleAbi | null>(null);
+  const [moduleBytecode, setModuleBytecode] = useState<MoveModuleBytecode | null>(null);
   const [selectedFunction, setSelectedFunction] = useState<string>('');
   const [typeArgValues, setTypeArgValues] = useState<string[]>([]);
   const [argStates, setArgStates] = useState<ArgState[]>([]);
@@ -68,6 +74,11 @@ export default function AptosToolPage() {
   const networkMismatch =
     submissionMode === 'wallet' && normalizedWalletNetwork && networkId !== 'custom' && normalizedWalletNetwork !== networkId;
 
+  const moduleAbi = useMemo(() => {
+    if (!moduleBytecode) return null;
+    return moduleBytecode.abi;
+  }, [moduleBytecode]);
+
   const entryFunctions = useMemo(() => {
     if (!moduleAbi) return [];
     return moduleAbi.exposed_functions.filter((fn) => fn.is_entry);
@@ -80,7 +91,7 @@ export default function AptosToolPage() {
     return selectedFn.params.filter((param) => !isSignerParameter(param));
   }, [selectedFn]);
 
-  const parameterTypes = useMemo(() => callableParams.map((param) => simplifyType(param)), [callableParams]);
+  const parameterTypes = useMemo(() => callableParams.map((param) => parseTypeTag(param)), [callableParams]);
 
   useEffect(() => {
     if (!selectedFn) {
@@ -94,74 +105,85 @@ export default function AptosToolPage() {
   }, [selectedFn, callableParams]);
 
   const convertRawValue = useCallback(
-    (tag: SimpleTypeTag, value: string) => {
+    (index: number, functionName: string,functionAbiOrModuleAbi: FunctionABI, genericTypeParams: TypeTag[],value: string) => {
       const trimmed = value.trim();
-      if (!trimmed && tag.kind !== 'string' && tag.kind !== 'vector') {
-        throw new Error(t('aptos.errors.parameterEmpty'));
+      
+      // 获取参数类型
+      const tag = parameterTypes[index];
+      if (!tag) {
+        throw new Error(t('aptos.errors.missingTypeInfo', { index: index + 1 }));
       }
-      switch (tag.kind) {
-        case 'bool':
-          if (trimmed === 'true' || trimmed === '1') return true;
-          if (trimmed === 'false' || trimmed === '0') return false;
-          throw new Error(t('aptos.errors.bool'));
-        case 'u8':
-        case 'u16':
-        case 'u32':
-        case 'u64':
-        case 'u128':
-        case 'u256':
-          return trimmed;
-        case 'address':
-          return trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`;
-        case 'string':
-          return value;
-        case 'vector':
-          if (tag.inner.kind === 'u8') {
-            return new TextEncoder().encode(value);
-          }
-          throw new Error(t('aptos.errors.vectorUnsupported'));
-        default:
-          throw new Error(t('aptos.errors.vectorUnsupported'));
+      
+      // 转换 SDK 的 TypeTag 到自定义 TypeTag
+      const customTag = convertTypeTag(tag);
+      
+      // 检查是否是 Option 类型
+      if (customTag.kind === 'option') {
+        // 如果是 Option 类型且输入为空，直接返回 null (None)
+        if (!trimmed) {
+          return convertArgument(
+            functionName,
+            functionAbiOrModuleAbi,
+            null,
+            index,
+            genericTypeParams,
+          );
+        }
       }
+      
+      return convertArgument(
+        functionName,
+        functionAbiOrModuleAbi,
+        trimmed,
+        index,
+        genericTypeParams,
+      )
     },
-    [t]
+    [t, parameterTypes]
   );
 
   const convertHexValue = useCallback(
-    (tag: SimpleTypeTag, value: string) => {
+    (index: number, functionName: string,functionAbiOrModuleAbi: FunctionABI, genericTypeParams: TypeTag[],value: string) => {
       if (!value.trim()) {
         throw new Error(t('aptos.errors.hexRequired'));
       }
-      if (tag.kind === 'string') {
-        const bytes = hexToBytes(value.trim());
-        return new TextDecoder().decode(bytes);
-      }
-      if (tag.kind === 'vector' && tag.inner.kind === 'u8') {
-        return hexToBytes(value.trim());
-      }
-      throw new Error(t('aptos.errors.hexUnsupported'));
+      const bytes = Hex.fromHexString(value.trim()).toUint8Array();
+      return convertArgument(
+        functionName,
+        functionAbiOrModuleAbi,
+        bytes,
+        index,
+        genericTypeParams,
+      )
     },
     [t]
   );
 
   const convertBcsValue = useCallback(
-    (tag: SimpleTypeTag, value: string) => {
-      if (!value.trim()) throw new Error(t('aptos.errors.bcsRequired'));
-      const primitive = toPrimitiveType(tag);
-      if (!primitive) {
-        throw new Error(t('aptos.errors.bcsUnsupported'));
+    (index: number, functionName: string,functionAbiOrModuleAbi: FunctionABI, genericTypeParams: TypeTag[], tag: TypeTag,value: string) => {
+      const trimmed = value.trim();
+      
+      // BCS 模式必须输入值
+      if (!trimmed) {
+        throw new Error(t('aptos.errors.bcsRequired'));
       }
-      const decoded = decodePrimitive(primitive, hexToBytes(value.trim()));
-      if (primitive.startsWith('u')) {
-        return decoded.toString();
-      }
-      if (primitive === 'bool' || primitive === 'string' || primitive === 'address') {
-        return decoded;
-      }
-      if (primitive === 'vector<u8>') {
-        return hexToBytes(decoded as string);
-      }
-      return decoded;
+      
+      const bytes = Hex.fromHexString(trimmed).toUint8Array();
+      
+      // 转换 SDK 的 TypeTag 到自定义 TypeTag
+      const customTag = convertTypeTag(tag);
+      
+      // 使用 BCS 解析功能将字节数据解析为 JavaScript 值
+      const parsedValue = decodeFromBytes(customTag, bytes);
+
+      // 将解析出的值转换为 convertArgument 可以处理的格式
+      return convertArgument(
+        functionName,
+        functionAbiOrModuleAbi,
+        parsedValue,
+        index,
+        genericTypeParams,
+      )
     },
     [t]
   );
@@ -177,16 +199,24 @@ export default function AptosToolPage() {
     }
     setModuleLoading(true);
     setModuleError(null);
+
+    const accountAddress = AccountAddress.fromString(moduleId.split('::')[0]);
+    const moduleName = moduleId.split('::')[1];
+
     try {
-      const abi = await fetchModuleAbi(restEndpoint, moduleId);
-      setModuleAbi(abi);
-      const firstEntry = abi.exposed_functions.find((fn) => fn.is_entry);
+      const moduleBytecode = await getModule({
+        aptosConfig: resolveNetworkConfig(networkId, restEndpoint),
+        accountAddress: accountAddress,
+        moduleName: moduleName,
+      });
+      setModuleBytecode(moduleBytecode);
+      const firstEntry = moduleBytecode?.abi?.exposed_functions.find((fn) => fn.is_entry);
       setSelectedFunction(firstEntry?.name ?? '');
       setSubmission({ status: 'idle' });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setModuleError(t('aptos.messages.abiLoadError', { message }));
-      setModuleAbi(null);
+      setModuleBytecode(null);
       setSelectedFunction('');
     } finally {
       setModuleLoading(false);
@@ -210,8 +240,24 @@ export default function AptosToolPage() {
   };
 
   const buildArguments = useCallback(() => {
+
+  if (!selectedFn || !moduleAbi) return [];
+
+  const numSigners = findFirstNonSignerArg(selectedFn);
+  const params: TypeTag[] = [];
+  for (let i = numSigners; i < selectedFn.params.length; i += 1) {
+    params.push(parseTypeTag(selectedFn.params[i], { allowGenerics: true }));
+  }
+
+  const functionAbi = {
+    signers: numSigners,
+    typeParameters: selectedFn.generic_type_params,
+    parameters: params,
+  };
+
     const outputs: unknown[] = [];
     const errors: Array<string | undefined> = [];
+    const genericTypeParams = typeArgValues.map((value) => parseTypeTag(value));
     argStates.forEach((state, index) => {
       const tag = parameterTypes[index];
       if (!tag) {
@@ -221,13 +267,13 @@ export default function AptosToolPage() {
       try {
         switch (state.mode) {
           case 'raw':
-            outputs[index] = convertRawValue(tag, state.rawValue);
+            outputs[index] = convertRawValue(index, selectedFn.name, functionAbi, genericTypeParams,state.rawValue);
             break;
           case 'hex':
-            outputs[index] = convertHexValue(tag, state.hexValue);
+            outputs[index] = convertHexValue(index, selectedFn.name, functionAbi, genericTypeParams,state.hexValue);
             break;
           case 'bcs':
-            outputs[index] = convertBcsValue(tag, state.bcsValue);
+            outputs[index] = convertBcsValue(index, selectedFn.name, functionAbi, genericTypeParams,  tag, state.bcsValue);
             break;
           default:
             errors[index] = t('aptos.errors.unknownMode');
@@ -249,7 +295,7 @@ export default function AptosToolPage() {
     }
 
     return outputs;
-  }, [argStates, convertBcsValue, convertHexValue, convertRawValue, parameterTypes, t]);
+  }, [argStates, convertBcsValue, convertHexValue, convertRawValue, parameterTypes, t, selectedFn]);
 
   const handleSubmit = async () => {
     if (!selectedFn || !moduleAbi) return;
@@ -472,16 +518,14 @@ export default function AptosToolPage() {
                     {callableParams.map((param, index) => {
                       const tag = parameterTypes[index];
                       const state = argStates[index];
-                      const typeLabel = getTypeLabel(tag);
-                      const primitive = toPrimitiveType(tag);
-                      const supportsHex = tag.kind === 'string' || (tag.kind === 'vector' && tag.inner.kind === 'u8');
-                      const supportsBcs = Boolean(primitive);
+                      const typeLabel = tag;
+                      const supportsHex = (typeLabel.isStruct() && typeLabel.toString() == "0x1::string::String") || (typeLabel.isVector() && typeLabel.toString() == "vector<u8>");
 
                       return (
                         <div key={`${param}-${index}`} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
                           <div className="flex flex-col gap-2 text-sm text-slate-300">
                             <span className="font-semibold text-slate-100">{t('aptos.arguments.label', { index: index + 1 })}</span>
-                            <span className="text-xs uppercase tracking-wide text-slate-500">{t('aptos.arguments.type', { type: typeLabel })}</span>
+                            <span className="text-xs uppercase tracking-wide text-slate-500">{t('aptos.arguments.type', { type: typeLabel.toString() })}</span>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2 text-xs">
                             <button
@@ -511,14 +555,11 @@ export default function AptosToolPage() {
                             </button>
                             <button
                               type="button"
-                              disabled={!supportsBcs}
                               onClick={() => handleArgModeChange(index, 'bcs')}
                               className={`rounded-full px-3 py-1 transition ${
                                 state?.mode === 'bcs'
                                   ? 'bg-sky-500/30 text-sky-200'
-                                  : supportsBcs
-                                      ? 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                      : 'bg-slate-800 text-slate-500 line-through'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                               }`}
                             >
                               {t('aptos.arguments.modes.bcs')}
@@ -529,11 +570,11 @@ export default function AptosToolPage() {
                             <div className="mt-4">
                               <textarea
                                 className="min-h-[90px] w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100"
-                                placeholder={tag.kind === 'string' ? t('aptos.arguments.placeholders.rawString') : t('aptos.arguments.placeholders.rawGeneric')}
+                                placeholder={typeLabel.toString() === "0x1::string::String" ? t('aptos.arguments.placeholders.rawString') : t('aptos.arguments.placeholders.rawGeneric')}
                                 value={state.rawValue}
                                 onChange={(event) => handleArgValueChange(index, 'rawValue', event.target.value)}
                               />
-                              {tag.kind === 'vector' && tag.inner.kind === 'u8' ? (
+                              {typeLabel.toString() === "vector<u8>" ? (
                                 <p className="mt-1 text-xs text-slate-500">{t('aptos.arguments.hints.rawVector')}</p>
                               ) : null}
                             </div>

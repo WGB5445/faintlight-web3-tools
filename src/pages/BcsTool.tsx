@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { bytesToHex, decodePrimitive, encodePrimitive, hexToBytes, PrimitiveBcsType } from '../lib/bcs';
 import { useLanguage } from '../context/LanguageContext';
+import { EntryFunctionArgumentTypes, SimpleEntryFunctionArgumentTypes , Bool, MoveString, AccountAddress, Hex, MoveVector, U8, Deserializer} from '@aptos-labs/ts-sdk';
+import { Buffer } from 'buffer';
 
 type EncodeInputMode = 'text' | 'hex';
 
-const PRIMITIVE_OPTIONS: Array<{ value: PrimitiveBcsType; labelKey: string; hintKey: string }> = [
+const PRIMITIVE_OPTIONS: Array<{ value: SimpleEntryFunctionArgumentTypes; labelKey: string; hintKey: string }> = [
   { value: 'bool', labelKey: 'bcs.options.bool.label', hintKey: 'bcs.options.bool.hint' },
   { value: 'u8', labelKey: 'bcs.options.u8.label', hintKey: 'bcs.options.u8.hint' },
   { value: 'u16', labelKey: 'bcs.options.u16.label', hintKey: 'bcs.options.u16.hint' },
@@ -20,7 +21,7 @@ const PRIMITIVE_OPTIONS: Array<{ value: PrimitiveBcsType; labelKey: string; hint
 export default function BcsToolPage() {
   const { t } = useLanguage();
   const [mode, setMode] = useState<'encode' | 'decode'>('encode');
-  const [primitive, setPrimitive] = useState<PrimitiveBcsType>('string');
+  const [primitive, setPrimitive] = useState<SimpleEntryFunctionArgumentTypes>('string');
   const [textInput, setTextInput] = useState('');
   const [hexInput, setHexInput] = useState('');
   const [boolInput, setBoolInput] = useState(true);
@@ -44,24 +45,24 @@ export default function BcsToolPage() {
     resetOutputs();
     try {
       if (mode === 'encode') {
-        let value: unknown;
+        let value: string;
         switch (primitive) {
           case 'bool':
-            value = boolInput;
+            value = new Bool(boolInput).bcsToHex().toString();
             break;
           case 'string':
-            value = textInput;
+            value = new MoveString(textInput).bcsToHex().toString();
             break;
           case 'address':
             if (!textInput.trim()) throw new Error(t('bcs.errors.valueRequired'));
-            value = textInput.trim();
+            value = AccountAddress.fromString(textInput.trim()).bcsToHex().toString();
             break;
           case 'vector<u8>':
             if (vectorMode === 'text') {
-              value = new TextEncoder().encode(textInput);
+              value = MoveVector.U8(new TextEncoder().encode(textInput)).bcsToHex().toString();
             } else {
               if (!hexInput.trim()) throw new Error(t('bcs.errors.hexRequired'));
-              value = hexToBytes(hexInput.trim());
+              value = MoveVector.U8(Hex.fromHexInput(hexInput.trim()).toUint8Array()).bcsToHex().toString();
             }
             break;
           default:
@@ -70,30 +71,31 @@ export default function BcsToolPage() {
             break;
         }
 
-        const encoded = encodePrimitive(primitive, value as any);
-        setResult(bytesToHex(encoded));
-        setAuxiliary(t('bcs.encode.byteLength', { length: encoded.length }));
+        setResult(value);
+        setAuxiliary(t('bcs.encode.byteLength', { length: value.length - 2}));
       } else {
         if (!hexInput.trim()) throw new Error(t('bcs.errors.hexRequired'));
-        const decodedBytes = hexToBytes(hexInput.trim());
-        const decoded = decodePrimitive(primitive, decodedBytes);
+        const decodedBytes = Hex.fromHexInput(hexInput.trim()).toUint8Array();
+        const decoded = new Deserializer(decodedBytes);
         switch (primitive) {
           case 'bool':
-            setResult(decoded ? 'true' : 'false');
+            setResult(decoded.deserialize(Bool) ? 'true' : 'false');
             break;
           case 'string':
-            setResult(String(decoded));
-            setAuxiliary(t('bcs.results.rawBytes', { bytes: bytesToHex(new TextEncoder().encode(String(decoded))) }));
+            const moveString = decoded.deserialize(MoveString);
+            setResult(moveString.value);
+            setAuxiliary(t('bcs.results.rawBytes', { bytes: Buffer.from(moveString.value, "utf8").toString("hex") }));
             break;
           case 'vector<u8>': {
-            const hex = decoded as string;
-            const text = new TextDecoder().decode(hexToBytes(hex));
+            const moveVector = decoded.deserializeVector(U8).map((item) => item.value);
+            const hex = Buffer.from(moveVector).toString("hex");
             setResult(t('bcs.results.vectorHex', { hex }));
-            setAuxiliary(t('bcs.results.vectorText', { text }));
+            setAuxiliary(t('bcs.results.vectorText', { text: Buffer.from(moveVector).toString("utf8") }));
             break;
           }
           case 'address':
-            setResult(String(decoded));
+            const moveAddress = decoded.deserialize(AccountAddress);
+            setResult(moveAddress.toString());
             break;
           default:
             setResult(decoded.toString());
@@ -233,14 +235,14 @@ export default function BcsToolPage() {
             {t('bcs.typeSelect.label')}
             <select
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-              value={primitive}
+              value={primitive?.toString() || ''}
               onChange={(event) => {
-                setPrimitive(event.target.value as PrimitiveBcsType);
+                setPrimitive(event.target.value as SimpleEntryFunctionArgumentTypes);
                 resetOutputs();
               }}
             >
               {PRIMITIVE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>
+                <option key={item.value?.toString() || ''} value={item.value?.toString() || ''}>
                   {t(item.labelKey)}
                 </option>
               ))}
