@@ -205,8 +205,20 @@ const en = {
       runDecode: 'Decode BCS hex'
     },
     typeSelect: {
-      label: 'Select type',
-      hint: 'Pick a primitive type to encode or decode.'
+      label: 'Select base type',
+      hint: 'Pick a primitive type and optionally wrap it before encoding.',
+      wrapperLabel: 'Wrappers',
+      addVector: 'Add vector<>',
+      addOption: 'Add Option<>',
+      clearWrappers: 'Clear wrappers',
+      wrapperEmpty: 'No wrappers applied.',
+      wrapperHint: 'Wrappers apply outside-in. Combine vector<> and Option<> to compose complex types.',
+      removeWrapper: 'Remove {wrapper}',
+      wrapperNames: {
+        vector: 'vector',
+        option: 'option'
+      },
+      currentType: 'Effective type: {type}'
     },
     options: {
       bool: {
@@ -260,6 +272,8 @@ const en = {
       hexPlaceholder: '0x…',
       vectorTextPlaceholder: 'Any string will be encoded as UTF-8 bytes.',
       vectorHexPlaceholder: '0x…',
+      jsonPlaceholder: 'JSON value, e.g. ["0x1", "0x2"] or {"foo":"bar"}',
+      jsonHint: 'Use JSON to describe nested vectors or options. Use null for Option::None.',
       byteLength: 'Byte length: {length}B'
     },
     decode: {
@@ -270,11 +284,22 @@ const en = {
       extraTitle: 'Additional info',
       rawBytes: 'Raw bytes: {bytes}',
       vectorHex: 'Hex: {hex}',
-      vectorText: 'Interpreted as text: {text}'
+      vectorText: 'Interpreted as text: {text}',
+      optionSome: 'Some({value})',
+      optionNone: 'None'
     },
     errors: {
       valueRequired: 'Please provide a value.',
-      hexRequired: 'Please provide BCS hex data.'
+      hexRequired: 'Please provide BCS hex data.',
+      jsonRequired: 'Provide a JSON value.',
+      invalidJson: 'Invalid JSON input.',
+      vectorRequiresArray: '{type} expects a JSON array.',
+      vectorBytesInput: 'vector<u8> requires hex, text, or an array of bytes.',
+      vectorU8Array: 'vector<u8> arrays must contain byte values (0-255).',
+      invalidNumber: 'Enter a valid {type} value.',
+      invalidBoolean: 'Boolean values must be true or false.',
+      unsupportedType: 'Unsupported type: {type}.',
+      invalidOptionLength: 'Option encoding must contain 0 or 1 element.'
     }
   },
   notFound: {

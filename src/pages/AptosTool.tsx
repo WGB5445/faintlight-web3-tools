@@ -4,7 +4,7 @@ import { AccountAddress, Bool, convertArgument, Deserializer, findFirstNonSigner
 import type { FunctionABI, InputEntryFunctionData, MoveModule, MoveModuleBytecode, TypeTag, TypeTagVector } from '@aptos-labs/ts-sdk';
 
 import { APTOS_NETWORKS, resolveRestEndpoint } from '../lib/networks';
-import { getExplorerTxUrl, getModule, resolveNetworkConfig, submitEntryFunction, waitForTransaction, decodeFromBytes, parseTypeTagLite, substituteGenerics, type TypeTag as CustomTypeTag } from '../lib/aptos';
+import { getExplorerTxUrl, getModule, resolveNetworkConfig, submitEntryFunction, waitForTransaction, decodeFromBytes, parseTypeTagLite, substituteGenerics, type TypeTag as CustomTypeTag, encodeArgs } from '../lib/aptos';
 import { useLanguage } from '../context/LanguageContext';
 import { truncateAddress } from '../lib/address';
 
@@ -91,7 +91,7 @@ export default function AptosToolPage() {
     return selectedFn.params.filter((param) => !isSignerParameter(param));
   }, [selectedFn]);
 
-  const parameterTypes = useMemo(() => callableParams.map((param) => parseTypeTag(param)), [callableParams]);
+  const parameterTypes = useMemo(() => callableParams.map((param) => parseTypeTagLite(param)), [callableParams]);
 
   useEffect(() => {
     if (!selectedFn) {
@@ -113,12 +113,9 @@ export default function AptosToolPage() {
       if (!tag) {
         throw new Error(t('aptos.errors.missingTypeInfo', { index: index + 1 }));
       }
-      
-      // 转换 SDK 的 TypeTag 到自定义 TypeTag
-      const customTag = convertTypeTag(tag);
-      
+    
       // 检查是否是 Option 类型
-      if (customTag.kind === 'option') {
+      if (tag.kind === 'option') {
         // 如果是 Option 类型且输入为空，直接返回 null (None)
         if (!trimmed) {
           return convertArgument(
@@ -172,10 +169,11 @@ export default function AptosToolPage() {
       
       // 转换 SDK 的 TypeTag 到自定义 TypeTag
       const customTag = convertTypeTag(tag);
+
+      console.log(customTag);
       
       // 使用 BCS 解析功能将字节数据解析为 JavaScript 值
       const parsedValue = decodeFromBytes(customTag, bytes);
-
       // 将解析出的值转换为 convertArgument 可以处理的格式
       return convertArgument(
         functionName,
@@ -267,13 +265,13 @@ export default function AptosToolPage() {
       try {
         switch (state.mode) {
           case 'raw':
-            outputs[index] = convertRawValue(index, selectedFn.name, functionAbi, genericTypeParams,state.rawValue);
+            outputs[index] = encodeArgs(tag, state.rawValue);
             break;
           case 'hex':
             outputs[index] = convertHexValue(index, selectedFn.name, functionAbi, genericTypeParams,state.hexValue);
             break;
           case 'bcs':
-            outputs[index] = convertBcsValue(index, selectedFn.name, functionAbi, genericTypeParams,  tag, state.bcsValue);
+            // outputs[index] = convertBcsValue(index, selectedFn.name, functionAbi, genericTypeParams, tag, state.bcsValue);
             break;
           default:
             errors[index] = t('aptos.errors.unknownMode');
@@ -518,14 +516,13 @@ export default function AptosToolPage() {
                     {callableParams.map((param, index) => {
                       const tag = parameterTypes[index];
                       const state = argStates[index];
-                      const typeLabel = tag;
-                      const supportsHex = (typeLabel.isStruct() && typeLabel.toString() == "0x1::string::String") || (typeLabel.isVector() && typeLabel.toString() == "vector<u8>");
+                      const supportsHex = (tag.kind === "struct" && tag.address === "0x1" && tag.module === "string" && tag.name === "String") || (tag.kind === "vector" && tag.elem.kind === "u8");
 
                       return (
                         <div key={`${param}-${index}`} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-inner">
                           <div className="flex flex-col gap-2 text-sm text-slate-300">
                             <span className="font-semibold text-slate-100">{t('aptos.arguments.label', { index: index + 1 })}</span>
-                            <span className="text-xs uppercase tracking-wide text-slate-500">{t('aptos.arguments.type', { type: typeLabel.toString() })}</span>
+                            <span className="text-xs uppercase tracking-wide text-slate-500">{t('aptos.arguments.type', { type: tag.kind })}</span>
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2 text-xs">
                             <button
@@ -570,11 +567,11 @@ export default function AptosToolPage() {
                             <div className="mt-4">
                               <textarea
                                 className="min-h-[90px] w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100"
-                                placeholder={typeLabel.toString() === "0x1::string::String" ? t('aptos.arguments.placeholders.rawString') : t('aptos.arguments.placeholders.rawGeneric')}
+                                placeholder={tag.kind === "struct" && tag.address === "0x1" && tag.module === "string" && tag.name === "String" ? t('aptos.arguments.placeholders.rawString') : t('aptos.arguments.placeholders.rawGeneric')}
                                 value={state.rawValue}
                                 onChange={(event) => handleArgValueChange(index, 'rawValue', event.target.value)}
                               />
-                              {typeLabel.toString() === "vector<u8>" ? (
+                              {tag.kind === "vector" && tag.elem.kind === "u8" ? (
                                 <p className="mt-1 text-xs text-slate-500">{t('aptos.arguments.hints.rawVector')}</p>
                               ) : null}
                             </div>

@@ -201,8 +201,20 @@ const zh = {
       runDecode: '解码 BCS Hex'
     },
     typeSelect: {
-      label: '选择类型',
-      hint: '选择需要编码或解码的基础类型。'
+      label: '选择基础类型',
+      hint: '先选择一个基础类型，再按需包裹 vector<> 或 Option<>。',
+      wrapperLabel: '类型封装',
+      addVector: '添加 vector<>',
+      addOption: '添加 Option<>',
+      clearWrappers: '清除封装',
+      wrapperEmpty: '当前未添加任何封装。',
+      wrapperHint: '封装按添加顺序由内到外应用，可组合 vector<> 与 Option<>。',
+      removeWrapper: '移除 {wrapper}',
+      wrapperNames: {
+        vector: 'vector',
+        option: 'option'
+      },
+      currentType: '最终类型：{type}'
     },
     options: {
       bool: {
@@ -256,6 +268,8 @@ const zh = {
       hexPlaceholder: '0x…',
       vectorTextPlaceholder: '任意字符串会按 UTF-8 编码为字节。',
       vectorHexPlaceholder: '0x…',
+      jsonPlaceholder: 'JSON 值，例如 ["0x1","0x2"] 或 {"foo":"bar"}',
+      jsonHint: '对嵌套的 vector 或 Option 使用 JSON 描述，Option::None 请填写 null。',
       byteLength: '字节长度：{length}B'
     },
     decode: {
@@ -266,11 +280,22 @@ const zh = {
       extraTitle: '附加信息',
       rawBytes: '原始字节：{bytes}',
       vectorHex: 'Hex：{hex}',
-      vectorText: '作为文本尝试解析：{text}'
+      vectorText: '作为文本尝试解析：{text}',
+      optionSome: 'Some({value})',
+      optionNone: 'None'
     },
     errors: {
       valueRequired: '请输入数据。',
-      hexRequired: '请输入 BCS Hex。'
+      hexRequired: '请输入 BCS Hex。',
+      jsonRequired: '请输入 JSON 数据。',
+      invalidJson: '无法解析 JSON。',
+      vectorRequiresArray: '{type} 需要 JSON 数组。',
+      vectorBytesInput: 'vector<u8> 仅支持文本、十六进制或字节数组形式。',
+      vectorU8Array: 'vector<u8> 数组元素必须是 0-255 的字节值。',
+      invalidNumber: '请输入合法的 {type} 数值。',
+      invalidBoolean: '布尔值只能是 true 或 false。',
+      unsupportedType: '暂不支持类型：{type}。',
+      invalidOptionLength: 'Option 编码的元素数量必须为 0 或 1。'
     }
   },
   notFound: {

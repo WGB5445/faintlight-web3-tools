@@ -1,4 +1,5 @@
-import { Account, AccountAddress, AccountAddressInput, Aptos, AptosConfig, Ed25519PrivateKey, getAptosFullNode, InputEntryFunctionData, LedgerVersionArg, MoveModuleBytecode, Network } from '@aptos-labs/ts-sdk';
+import { Account, AccountAddress, AccountAddressInput, Aptos, AptosConfig, Bool, Ed25519PrivateKey, EntryFunctionArgument, EntryFunctionArgumentTypes, getAptosFullNode, Hex, InputEntryFunctionData, LedgerVersionArg, MoveModuleBytecode, MoveOption, MoveString, MoveVector, Network, U128, U16, U256, U32, U64, U8 } from '@aptos-labs/ts-sdk';
+import { Buffer } from 'buffer';
 
 export interface SubmitEntryFunctionParams {
   senderPrivateKeyHex: string;
@@ -627,4 +628,38 @@ export function decodeBcsArgs(opts: {
   const typeArgs = typeArgStrings.map(parseTypeTagLite);
   const replaced = paramTags.map(t => substituteGenerics(t, typeArgs));
   return replaced.map((t, i) => decodeFromBytes(t, bcsArgs[i]));
+}
+
+
+export function encodeArgs(
+  tag: TypeTag,
+  value: unknown
+): EntryFunctionArgumentTypes{
+  switch (tag.kind) {
+    case "bool":
+      if (value === "true") return new Bool(true);
+      if (value === "false") return new Bool(false);
+      if (typeof value === "boolean") return new Bool(value);
+      throw new Error("Invalid bool value: " + value);
+    case "u8":
+      return new U8(Number(value));
+    case "u16":
+      return new U16(Number(value)); 
+    case "address":
+      return AccountAddress.fromString(value as string);
+    case "string":
+      return new MoveString(String(value));
+    case "vector":
+      return new MoveVector( (value as []).map(item => encodeArgs(tag.elem, item)) );
+    case "option":
+      return new MoveOption(value === null || value === undefined ? null : value === ""? null : encodeArgs(tag.elem, value));
+    case "struct":
+      if( AccountAddress.fromString(tag.address).toString() === "0x1" && tag.module === "object" && tag.name === "Object") {
+        return AccountAddress.from(value as string);
+      }else if (AccountAddress.fromString(tag.address).toString() === "0x1" && tag.module === "string" && tag.name === "String") {
+        return new MoveString(String(value));
+      }
+      throw new Error(`Unsupported struct in encode: ${tag.address}::${tag.module}::${tag.name}`);
+  }
+  throw new Error(`Unsupported type in encode: ${tag.kind}`);
 }
