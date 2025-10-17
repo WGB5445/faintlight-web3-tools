@@ -3,9 +3,10 @@ import {  getAptosConfig, NetworkInfo, useWallet } from '@aptos-labs/wallet-adap
 import { AccountAddress, Bool, convertArgument, Deserializer, findFirstNonSignerArg, Hex, MoveOption, MoveString, parseTypeTag, Serialized, U128, U16, U256, U32, U64, U8 } from '@aptos-labs/ts-sdk';
 import type { FunctionABI, InputEntryFunctionData, MoveModule, MoveModuleBytecode, TypeTag, TypeTagVector } from '@aptos-labs/ts-sdk';
 
-import { APTOS_NETWORKS, resolveRestEndpoint } from '../lib/networks';
-import { getExplorerTxUrl, getModule, resolveNetworkConfig, submitEntryFunction, waitForTransaction, decodeFromBytes, parseTypeTagLite, substituteGenerics, type TypeTag as CustomTypeTag, encodeArgs } from '../lib/aptos';
+import { APTOS_NETWORKS } from '../lib/networks';
+import { getExplorerTxUrl, getModule, resolveNetworkConfig, submitEntryFunction, waitForTransaction, decodeFromBytes, parseTypeTagLite, substituteGenerics, type TypeTag as CustomTypeTag, encodeArgsPrimitivesTypes } from '../lib/aptos';
 import { useLanguage } from '../context/LanguageContext';
+import { useAptosSettings } from '../context/AptosSettingsContext';
 import { truncateAddress } from '../lib/address';
 
 type ArgMode = 'raw' | 'hex' | 'bcs';
@@ -54,9 +55,8 @@ function extractTxnHash(value: unknown): string {
 
 export default function AptosToolPage() {
   const { t } = useLanguage();
-  const [networkId, setNetworkId] = useState<'mainnet' | 'testnet' | 'devnet' | 'custom'>('testnet');
+  const { networkId, setNetworkId, customEndpoint, setCustomEndpoint, restEndpoint } = useAptosSettings();
   const [submissionMode, setSubmissionMode] = useState<SubmissionMode>('wallet');
-  const [customEndpoint, setCustomEndpoint] = useState('');
   const [moduleId, setModuleId] = useState('');
   const [moduleLoading, setModuleLoading] = useState(false);
   const [moduleError, setModuleError] = useState<string | null>(null);
@@ -68,8 +68,6 @@ export default function AptosToolPage() {
   const [submission, setSubmission] = useState<SubmissionState>({ status: 'idle' });
 
   const { connected, account, wallet: activeWallet, network: walletNetwork, signAndSubmitTransaction } = useWallet();
-
-  const restEndpoint = useMemo(() => resolveRestEndpoint(networkId, customEndpoint), [networkId, customEndpoint]);
   const normalizedWalletNetwork = walletNetwork?.name ? walletNetwork.name.toLowerCase() : null;
   const networkMismatch =
     submissionMode === 'wallet' && normalizedWalletNetwork && networkId !== 'custom' && normalizedWalletNetwork !== networkId;
@@ -265,7 +263,7 @@ export default function AptosToolPage() {
       try {
         switch (state.mode) {
           case 'raw':
-            outputs[index] = encodeArgs(tag, state.rawValue);
+            outputs[index] = encodeArgsPrimitivesTypes(tag, state.rawValue);
             break;
           case 'hex':
             outputs[index] = convertHexValue(index, selectedFn.name, functionAbi, genericTypeParams,state.hexValue);
@@ -404,7 +402,10 @@ export default function AptosToolPage() {
             <select
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
               value={networkId}
-              onChange={(event) => setNetworkId(event.target.value as typeof networkId)}
+              onChange={(event) => {
+                const nextNetwork = event.target.value as 'mainnet' | 'testnet' | 'devnet' | 'custom';
+                setNetworkId(nextNetwork);
+              }}
             >
               {APTOS_NETWORKS.map((network) => (
                 <option key={network.id} value={network.id}>
@@ -429,7 +430,7 @@ export default function AptosToolPage() {
             <div className="flex flex-col gap-2 text-sm text-slate-400">
               <span className="font-medium text-slate-300">{t('aptos.network.restLabel')}</span>
               <span className="truncate rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs">
-                {resolveRestEndpoint(networkId)}
+                {restEndpoint}
               </span>
             </div>
           )}

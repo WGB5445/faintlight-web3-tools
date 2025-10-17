@@ -1,4 +1,4 @@
-import { Account, AccountAddress, AccountAddressInput, Aptos, AptosConfig, Bool, Ed25519PrivateKey, EntryFunctionArgument, EntryFunctionArgumentTypes, getAptosFullNode, Hex, InputEntryFunctionData, LedgerVersionArg, MoveModuleBytecode, MoveOption, MoveString, MoveVector, Network, U128, U16, U256, U32, U64, U8 } from '@aptos-labs/ts-sdk';
+import { Account, AccountAddress, AccountAddressInput, Aptos, AptosConfig, Bool, Ed25519PrivateKey, EntryFunctionArgument, EntryFunctionArgumentTypes, getAptosFullNode, Hex, InputEntryFunctionData, LedgerVersionArg, MoveModuleBytecode, MoveOption, MoveString, MoveVector, Network, SimpleEntryFunctionArgumentTypes, U128, U16, U256, U32, U64, U8 } from '@aptos-labs/ts-sdk';
 import { Buffer } from 'buffer';
 
 export interface SubmitEntryFunctionParams {
@@ -118,7 +118,7 @@ export type TypeTag =
 
 // ---------- 解析：TypeTag 字符串 -> AST ----------
 export function parseTypeTagLite(input: string): TypeTag {
-  const s = input.replace(/\s+/g, "");
+  const s = input.replace(/\s+/g, "").replace(/^&mut\s+/, "").replace(/^&/, "");
   let i = 0;
 
   function peek() { return s[i]; }
@@ -631,7 +631,7 @@ export function decodeBcsArgs(opts: {
 }
 
 
-export function encodeArgs(
+export function encodeArgsAptosTypes(
   tag: TypeTag,
   value: unknown
 ): EntryFunctionArgumentTypes{
@@ -650,9 +650,9 @@ export function encodeArgs(
     case "string":
       return new MoveString(String(value));
     case "vector":
-      return new MoveVector( (value as []).map(item => encodeArgs(tag.elem, item)) );
+      return new MoveVector( (value as []).map(item => encodeArgsAptosTypes(tag.elem, item)) );
     case "option":
-      return new MoveOption(value === null || value === undefined ? null : value === ""? null : encodeArgs(tag.elem, value));
+      return new MoveOption(value === null || value === undefined ? null : value === ""? null : encodeArgsAptosTypes(tag.elem, value));
     case "struct":
       if( AccountAddress.fromString(tag.address).toString() === "0x1" && tag.module === "object" && tag.name === "Object") {
         return AccountAddress.from(value as string);
@@ -662,4 +662,38 @@ export function encodeArgs(
       throw new Error(`Unsupported struct in encode: ${tag.address}::${tag.module}::${tag.name}`);
   }
   throw new Error(`Unsupported type in encode: ${tag.kind}`);
+}
+
+export function encodeArgsPrimitivesTypes(
+  tag: TypeTag,
+  value: unknown
+): SimpleEntryFunctionArgumentTypes{
+  switch (tag.kind) {
+    case "bool":
+      if (value === "true") return true;
+      if (value === "false") return false;
+      if (typeof value === "boolean") return value;
+      throw new Error("Invalid bool value: " + value);
+    case "u8":
+      return Number(value);
+    case "u16":
+      return Number(value);
+    case "u32":
+      return Number(value);
+    case "u64":
+      return Number(value);
+    case "u128":
+      return Number(value);
+    case "u256":
+      return Number(value);
+    case "address":
+      return AccountAddress.fromString(value as string).toString();
+    case "string":
+      return String(value);
+    case "vector":
+      const valueArray = JSON.parse(value as string) as unknown[];
+      return valueArray.map(item => encodeArgsPrimitivesTypes(tag.elem, item));
+    case "option":
+      return value === null || value === undefined ? null : value === ""? null : encodeArgsPrimitivesTypes(tag.elem, value);
+  }
 }

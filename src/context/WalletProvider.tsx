@@ -1,17 +1,19 @@
 import { ReactNode, useMemo } from 'react';
 import { AptosWalletAdapterProvider } from '@aptos-labs/wallet-adapter-react';
-import { Network } from '@aptos-labs/ts-sdk';
+
+import { useAptosSettings } from './AptosSettingsContext';
+
 interface WalletProviderProps {
   children: ReactNode;
 }
 
 export default function WalletProvider({ children }: WalletProviderProps) {
+  const { walletNetwork } = useAptosSettings();
+
+  const dappConfig = useMemo(() => ({ network: walletNetwork }), [walletNetwork]);
+
   return (
-    <AptosWalletAdapterProvider autoConnect dappConfig={
-      {
-        network: Network.TESTNET
-      }
-    }>
+    <AptosWalletAdapterProvider key={walletNetwork} autoConnect dappConfig={dappConfig}>
       {children}
     </AptosWalletAdapterProvider>
   );
