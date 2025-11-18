@@ -54,6 +54,10 @@ const zh = {
       aptosBcs: {
         label: 'BCS 编 / 解码',
         description: '快速在 BCS 与常见原始类型之间转换。'
+      },
+      aptosAbi: {
+        label: 'ABI 查看器',
+        description: '查看和探索模块 ABI 定义与字节码。'
       }
     }
   },
@@ -187,6 +191,49 @@ const zh = {
     },
     messages: {
       abiLoadError: '无法获取模块 ABI：{message}'
+    }
+  },
+  aptosAbi: {
+    title: 'Aptos ABI 查看器',
+    description: '探索模块 ABI 定义，查看函数签名、结构体定义和字节码。',
+    actions: {
+      loadAbi: '加载 ABI',
+      expandAll: '全部展开',
+      collapseAll: '全部折叠'
+    },
+    moduleInfo: {
+      title: '模块信息',
+      address: '地址',
+      name: '名称',
+      overview: '概览',
+      entryFunctions: '入口函数',
+      viewFunctions: '视图函数',
+      structs: '结构体'
+    },
+    entryFunctions: {
+      title: '入口函数',
+      empty: '该模块中没有找到入口函数。'
+    },
+    viewFunctions: {
+      title: '视图函数',
+      empty: '该模块中没有找到视图函数。'
+    },
+    structs: {
+      title: '结构体',
+      empty: '该模块中没有找到结构体。'
+    },
+    bytecode: {
+      title: '字节码',
+      hex: '十六进制表示'
+    },
+    functionTabs: {
+      details: '详情',
+      moveCode: 'Move 代码',
+      tsExample: 'TypeScript 示例'
+    },
+    code: {
+      copy: '复制',
+      copied: '已复制!'
     }
   },
   bcs: {

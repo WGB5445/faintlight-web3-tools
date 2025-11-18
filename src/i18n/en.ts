@@ -56,6 +56,10 @@ const en = {
       aptosBcs: {
         label: 'BCS Encoder / Decoder',
         description: 'Convert values to and from Aptos BCS primitives.'
+      },
+      aptosAbi: {
+        label: 'ABI Viewer',
+        description: 'View and explore module ABI definitions and bytecode.'
       }
     }
   },
@@ -191,6 +195,49 @@ const en = {
     },
     messages: {
       abiLoadError: 'Failed to load module ABI: {message}'
+    }
+  },
+  aptosAbi: {
+    title: 'Aptos ABI Viewer',
+    description: 'Explore module ABI definitions, view function signatures, struct definitions, and bytecode.',
+    actions: {
+      loadAbi: 'Load ABI',
+      expandAll: 'Expand All',
+      collapseAll: 'Collapse All'
+    },
+    moduleInfo: {
+      title: 'Module Information',
+      address: 'Address',
+      name: 'Name',
+      overview: 'Overview',
+      entryFunctions: 'Entry Functions',
+      viewFunctions: 'View Functions',
+      structs: 'Structs'
+    },
+    entryFunctions: {
+      title: 'Entry Functions',
+      empty: 'No entry functions found in this module.'
+    },
+    viewFunctions: {
+      title: 'View Functions',
+      empty: 'No view functions found in this module.'
+    },
+    structs: {
+      title: 'Structs',
+      empty: 'No structs found in this module.'
+    },
+    bytecode: {
+      title: 'Bytecode',
+      hex: 'Hex Representation'
+    },
+    functionTabs: {
+      details: 'Details',
+      moveCode: 'Move Code',
+      tsExample: 'TypeScript Example'
+    },
+    code: {
+      copy: 'Copy',
+      copied: 'Copied!'
     }
   },
   bcs: {

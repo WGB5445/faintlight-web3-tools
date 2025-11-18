@@ -9,6 +9,7 @@ import { useLanguage } from './context/LanguageContext';
 const AptosLayout = lazy(() => import('./components/layout/AptosLayout'));
 const AptosToolPage = lazy(() => import('./pages/AptosTool'));
 const BcsToolPage = lazy(() => import('./pages/BcsTool'));
+const AptosAbiViewerPage = lazy(() => import('./pages/AptosAbiViewer'));
 
 function RouteLoader() {
   return (
@@ -57,6 +58,14 @@ export default function App() {
               element={
                 <Suspense fallback={<RouteLoader />}>
                   <BcsToolPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="abi-viewer"
+              element={
+                <Suspense fallback={<RouteLoader />}>
+                  <AptosAbiViewerPage />
                 </Suspense>
               }
             />

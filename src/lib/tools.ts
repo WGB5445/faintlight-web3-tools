@@ -38,6 +38,11 @@ export const TOOL_GROUPS: ToolGroup[] = [
         slug: 'aptos/bcs-tools',
         labelKey: 'navigation.tools.aptosBcs.label',
         descriptionKey: 'navigation.tools.aptosBcs.description'
+      },
+      {
+        slug: 'aptos/abi-viewer',
+        labelKey: 'navigation.tools.aptosAbi.label',
+        descriptionKey: 'navigation.tools.aptosAbi.description'
       }
     ]
   }
