@@ -30,8 +30,12 @@ export function AptosSettingsProvider({ children }: { children: ReactNode }) {
         return Network.DEVNET;
       case 'testnet':
         return Network.TESTNET;
+      case 'custom':
+        // 使用 TESTNET 作为回退，因为某些钱包不支持 CUSTOM 网络
+        // 注意：钱包连接功能在自定义网络上可能不可用
+        return Network.TESTNET;
       default:
-        return Network.CUSTOM;
+        return Network.TESTNET;
     }
   }, [networkId]);
 

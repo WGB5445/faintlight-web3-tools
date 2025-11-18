@@ -60,6 +60,10 @@ const en = {
       aptosAbi: {
         label: 'ABI Viewer',
         description: 'View and explore module ABI definitions and bytecode.'
+      },
+      aptosGasSchedule: {
+        label: 'Gas Schedule Lookup',
+        description: 'Browse and search Aptos gas schedule entries with filtering and sorting.'
       }
     }
   },
@@ -347,6 +351,59 @@ const en = {
       invalidBoolean: 'Boolean values must be true or false.',
       unsupportedType: 'Unsupported type: {type}.',
       invalidOptionLength: 'Option encoding must contain 0 or 1 element.'
+    }
+  },
+  gasSchedule: {
+    title: 'Gas Schedule Lookup',
+    description: 'Browse, search, and analyze Aptos gas schedule entries from the chain.',
+    actions: {
+      load: 'Load Gas Schedule',
+      reload: 'Reload',
+      loading: 'Loading…',
+      copy: 'Copy',
+      copied: 'Copied!',
+      copyAllKeys: 'Copy All Keys'
+    },
+    errors: {
+      missingEndpoint: 'Please configure a valid fullnode endpoint first.',
+      loadError: 'Failed to load gas schedule: {message}'
+    },
+    statistics: {
+      title: 'Statistics',
+      featureVersion: 'Feature Version',
+      scalingFactor: 'Scaling Factor',
+      totalEntries: 'Total Entries',
+      filteredEntries: 'Filtered Entries',
+      byType: 'By Type',
+      other: 'Other',
+      valueRange: 'Value Range',
+      min: 'Min',
+      max: 'Max',
+      avg: 'Average'
+    },
+    filters: {
+      title: 'Filters & Sort',
+      search: 'Search',
+      searchPlaceholder: 'Search by key name...',
+      type: 'Filter by Type',
+      typeAll: 'All Types',
+      typeInstr: 'Instructions (instr.*)',
+      typeTxn: 'Transactions (txn.*)',
+      typeOther: 'Other',
+      sortBy: 'Sort By',
+      sortKey: 'Key',
+      sortValue: 'Value',
+      sortOrder: 'Sort Order',
+      sortAsc: 'Ascending',
+      sortDesc: 'Descending',
+      showExternalGas: 'Show External Gas Units'
+    },
+    entries: {
+      title: 'Gas Schedule Entries',
+      key: 'Key',
+      value: 'Value',
+      actions: 'Actions',
+      empty: 'No entries match the current filters.'
     }
   },
   notFound: {

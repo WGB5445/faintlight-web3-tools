@@ -43,6 +43,11 @@ export const TOOL_GROUPS: ToolGroup[] = [
         slug: 'aptos/abi-viewer',
         labelKey: 'navigation.tools.aptosAbi.label',
         descriptionKey: 'navigation.tools.aptosAbi.description'
+      },
+      {
+        slug: 'aptos/gas-schedule',
+        labelKey: 'navigation.tools.aptosGasSchedule.label',
+        descriptionKey: 'navigation.tools.aptosGasSchedule.description'
       }
     ]
   }

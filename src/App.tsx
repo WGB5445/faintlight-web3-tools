@@ -10,6 +10,7 @@ const AptosLayout = lazy(() => import('./components/layout/AptosLayout'));
 const AptosToolPage = lazy(() => import('./pages/AptosTool'));
 const BcsToolPage = lazy(() => import('./pages/BcsTool'));
 const AptosAbiViewerPage = lazy(() => import('./pages/AptosAbiViewer'));
+const GasScheduleToolPage = lazy(() => import('./pages/GasScheduleTool'));
 
 function RouteLoader() {
   return (
@@ -66,6 +67,14 @@ export default function App() {
               element={
                 <Suspense fallback={<RouteLoader />}>
                   <AptosAbiViewerPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="gas-schedule"
+              element={
+                <Suspense fallback={<RouteLoader />}>
+                  <GasScheduleToolPage />
                 </Suspense>
               }
             />

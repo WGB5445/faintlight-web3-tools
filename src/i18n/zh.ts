@@ -58,6 +58,10 @@ const zh = {
       aptosAbi: {
         label: 'ABI 查看器',
         description: '查看和探索模块 ABI 定义与字节码。'
+      },
+      aptosGasSchedule: {
+        label: 'Gas 费用表查询',
+        description: '浏览和搜索 Aptos gas 费用表条目，支持筛选和排序。'
       }
     }
   },
@@ -343,6 +347,59 @@ const zh = {
       invalidBoolean: '布尔值只能是 true 或 false。',
       unsupportedType: '暂不支持类型：{type}。',
       invalidOptionLength: 'Option 编码的元素数量必须为 0 或 1。'
+    }
+  },
+  gasSchedule: {
+    title: 'Gas 费用表查询',
+    description: '浏览、搜索和分析链上的 Aptos gas 费用表条目。',
+    actions: {
+      load: '加载 Gas 费用表',
+      reload: '重新加载',
+      loading: '加载中…',
+      copy: '复制',
+      copied: '已复制!',
+      copyAllKeys: '复制所有键名'
+    },
+    errors: {
+      missingEndpoint: '请先配置有效的节点地址。',
+      loadError: '加载 gas 费用表失败：{message}'
+    },
+    statistics: {
+      title: '统计信息',
+      featureVersion: '功能版本',
+      scalingFactor: '缩放因子',
+      totalEntries: '总条目数',
+      filteredEntries: '筛选后条目数',
+      byType: '按类型',
+      other: '其他',
+      valueRange: '数值范围',
+      min: '最小值',
+      max: '最大值',
+      avg: '平均值'
+    },
+    filters: {
+      title: '筛选与排序',
+      search: '搜索',
+      searchPlaceholder: '按键名搜索...',
+      type: '按类型筛选',
+      typeAll: '所有类型',
+      typeInstr: '指令 (instr.*)',
+      typeTxn: '交易 (txn.*)',
+      typeOther: '其他',
+      sortBy: '排序字段',
+      sortKey: '键名',
+      sortValue: '数值',
+      sortOrder: '排序顺序',
+      sortAsc: '升序',
+      sortDesc: '降序',
+      showExternalGas: '显示外部 Gas 单位'
+    },
+    entries: {
+      title: 'Gas 费用表条目',
+      key: '键名',
+      value: '数值',
+      actions: '操作',
+      empty: '没有条目匹配当前筛选条件。'
     }
   },
   notFound: {
