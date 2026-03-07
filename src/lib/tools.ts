@@ -13,44 +13,44 @@ export type ToolGroup = {
 
 export const TOOL_GROUPS: ToolGroup[] = [
   {
-    id: 'overview',
-    titleKey: 'navigation.groups.overview.title',
-    hintKey: 'navigation.groups.overview.hint',
+    id: "overview",
+    titleKey: "navigation.groups.overview.title",
+    hintKey: "navigation.groups.overview.hint",
     items: [
       {
-        slug: '',
-        labelKey: 'navigation.tools.overview.label',
-        descriptionKey: 'navigation.tools.overview.description'
-      }
-    ]
+        slug: "",
+        labelKey: "navigation.tools.overview.label",
+        descriptionKey: "navigation.tools.overview.description",
+      },
+    ],
   },
   {
-    id: 'aptos',
-    titleKey: 'navigation.groups.aptos.title',
-    hintKey: 'navigation.groups.aptos.hint',
+    id: "aptos",
+    titleKey: "navigation.groups.aptos.title",
+    hintKey: "navigation.groups.aptos.hint",
     items: [
       {
-        slug: 'aptos/contract-interaction',
-        labelKey: 'navigation.tools.aptosInteraction.label',
-        descriptionKey: 'navigation.tools.aptosInteraction.description'
+        slug: "aptos/contract-interaction",
+        labelKey: "navigation.tools.aptosInteraction.label",
+        descriptionKey: "navigation.tools.aptosInteraction.description",
       },
       {
-        slug: 'aptos/bcs-tools',
-        labelKey: 'navigation.tools.aptosBcs.label',
-        descriptionKey: 'navigation.tools.aptosBcs.description'
+        slug: "aptos/bcs-tools",
+        labelKey: "navigation.tools.aptosBcs.label",
+        descriptionKey: "navigation.tools.aptosBcs.description",
       },
       {
-        slug: 'aptos/abi-viewer',
-        labelKey: 'navigation.tools.aptosAbi.label',
-        descriptionKey: 'navigation.tools.aptosAbi.description'
+        slug: "aptos/abi-viewer",
+        labelKey: "navigation.tools.aptosAbi.label",
+        descriptionKey: "navigation.tools.aptosAbi.description",
       },
       {
-        slug: 'aptos/gas-schedule',
-        labelKey: 'navigation.tools.aptosGasSchedule.label',
-        descriptionKey: 'navigation.tools.aptosGasSchedule.description'
-      }
-    ]
-  }
+        slug: "aptos/gas-schedule",
+        labelKey: "navigation.tools.aptosGasSchedule.label",
+        descriptionKey: "navigation.tools.aptosGasSchedule.description",
+      },
+    ],
+  },
 ];
 
 export function findToolBySlug(slug: string) {

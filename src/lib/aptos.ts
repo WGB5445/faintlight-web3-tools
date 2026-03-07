@@ -1,22 +1,51 @@
-import { Account, AccountAddress, AccountAddressInput, Aptos, AptosConfig, Bool, Ed25519PrivateKey, EntryFunctionArgument, EntryFunctionArgumentTypes, getAptosFullNode, Hex, InputEntryFunctionData, LedgerVersionArg, MoveModuleBytecode, MoveOption, MoveString, MoveVector, Network, SimpleEntryFunctionArgumentTypes, U128, U16, U256, U32, U64, U8 } from '@aptos-labs/ts-sdk';
-import { Buffer } from 'buffer';
+import {
+  Account,
+  AccountAddress,
+  AccountAddressInput,
+  Aptos,
+  AptosConfig,
+  Bool,
+  Ed25519PrivateKey,
+  EntryFunctionArgument,
+  EntryFunctionArgumentTypes,
+  getAptosFullNode,
+  Hex,
+  InputEntryFunctionData,
+  LedgerVersionArg,
+  MoveModuleBytecode,
+  MoveOption,
+  MoveString,
+  MoveVector,
+  Network,
+  SimpleEntryFunctionArgumentTypes,
+  U128,
+  U16,
+  U256,
+  U32,
+  U64,
+  U8,
+} from "@aptos-labs/ts-sdk";
+import { Buffer } from "buffer";
 
 export interface SubmitEntryFunctionParams {
   senderPrivateKeyHex: string;
   restUrl: string;
-  networkId: 'mainnet' | 'testnet' | 'devnet' | 'custom';
+  networkId: "mainnet" | "testnet" | "devnet" | "custom";
   data: InputEntryFunctionData;
 }
 
-export function resolveNetworkConfig(networkId: SubmitEntryFunctionParams['networkId'], restUrl: string) {
+export function resolveNetworkConfig(
+  networkId: SubmitEntryFunctionParams["networkId"],
+  restUrl: string,
+) {
   switch (networkId) {
-    case 'mainnet':
+    case "mainnet":
       return new AptosConfig({ network: Network.MAINNET, fullnode: restUrl });
-    case 'testnet':
+    case "testnet":
       return new AptosConfig({ network: Network.TESTNET, fullnode: restUrl });
-    case 'devnet':
+    case "devnet":
       return new AptosConfig({ network: Network.DEVNET, fullnode: restUrl });
-    case 'custom':
+    case "custom":
     default:
       return new AptosConfig({ fullnode: restUrl });
   }
@@ -39,8 +68,12 @@ export async function getModule(args: {
   return data;
 }
 
-
-export async function submitEntryFunction({ senderPrivateKeyHex, restUrl, networkId, data }: SubmitEntryFunctionParams) {
+export async function submitEntryFunction({
+  senderPrivateKeyHex,
+  restUrl,
+  networkId,
+  data,
+}: SubmitEntryFunctionParams) {
   const config = resolveNetworkConfig(networkId, restUrl);
   const aptos = new Aptos(config);
 
@@ -49,38 +82,43 @@ export async function submitEntryFunction({ senderPrivateKeyHex, restUrl, networ
 
   const transaction = await aptos.transaction.build.simple({
     sender: account.accountAddress.toString(),
-    data
+    data,
   });
 
-  const pendingTransaction = await aptos.signAndSubmitTransaction({ signer: account, transaction });
-  const executed = await aptos.waitForTransaction({ transactionHash: pendingTransaction.hash });
+  const pendingTransaction = await aptos.signAndSubmitTransaction({
+    signer: account,
+    transaction,
+  });
+  const executed = await aptos.waitForTransaction({
+    transactionHash: pendingTransaction.hash,
+  });
 
   return executed;
 }
 
 function ensureHexPrefix(hash: string) {
-  return hash.startsWith('0x') ? hash : `0x${hash}`;
+  return hash.startsWith("0x") ? hash : `0x${hash}`;
 }
 
 const EXPLORER_BASE_BY_NETWORK: Record<string, string> = {
-  mainnet: 'https://explorer.aptoslabs.com/txn/',
-  testnet: 'https://explorer.aptoslabs.com/txn/',
-  devnet: 'https://explorer.aptoslabs.com/txn/'
+  mainnet: "https://explorer.aptoslabs.com/txn/",
+  testnet: "https://explorer.aptoslabs.com/txn/",
+  devnet: "https://explorer.aptoslabs.com/txn/",
 };
 
 const EXPLORER_QUERY_BY_NETWORK: Record<string, string> = {
-  mainnet: '?network=mainnet',
-  testnet: '?network=testnet',
-  devnet: '?network=devnet'
+  mainnet: "?network=mainnet",
+  testnet: "?network=testnet",
+  devnet: "?network=devnet",
 };
 
 export function getExplorerTxUrl({
   preferredNetwork,
   fallbackNetwork,
-  hash
+  hash,
 }: {
   preferredNetwork?: string | null;
-  fallbackNetwork: SubmitEntryFunctionParams['networkId'];
+  fallbackNetwork: SubmitEntryFunctionParams["networkId"];
   hash: string;
 }) {
   const normalizedHash = ensureHexPrefix(hash);
@@ -90,15 +128,16 @@ export function getExplorerTxUrl({
   const primaryQuery = primary ? EXPLORER_QUERY_BY_NETWORK[primary] : undefined;
 
   if (primaryBase) {
-    return `${primaryBase}${normalizedHash}${primaryQuery ?? ''}`;
+    return `${primaryBase}${normalizedHash}${primaryQuery ?? ""}`;
   }
 
-  const fallbackKey = fallbackNetwork !== 'custom' ? fallbackNetwork : 'mainnet';
+  const fallbackKey =
+    fallbackNetwork !== "custom" ? fallbackNetwork : "mainnet";
   const fallbackBase = EXPLORER_BASE_BY_NETWORK[fallbackKey];
   const fallbackQuery = EXPLORER_QUERY_BY_NETWORK[fallbackKey];
 
   if (!fallbackBase) return null;
-  return `${fallbackBase}${normalizedHash}${fallbackQuery ?? ''}`;
+  return `${fallbackBase}${normalizedHash}${fallbackQuery ?? ""}`;
 }
 
 export async function waitForTransaction(restUrl: string, hash: string) {
@@ -107,21 +146,33 @@ export async function waitForTransaction(restUrl: string, hash: string) {
   return aptos.waitForTransaction({ transactionHash: ensureHexPrefix(hash) });
 }
 
-
 export type TypeTag =
-  | { kind: "bool" | "u8" | "u16" | "u32" | "u64" | "u128" | "u256" | "address" }
+  | {
+      kind: "bool" | "u8" | "u16" | "u32" | "u64" | "u128" | "u256" | "address";
+    }
   | { kind: "vector"; elem: TypeTag }
   | { kind: "option"; elem: TypeTag } // 0x1::option::Option<T> 的语义
-  | { kind: "string" }                // 0x1::string::String
+  | { kind: "string" } // 0x1::string::String
   | { kind: "generic"; index: number } // T0/T1/...
-  | { kind: "struct"; address: string; module: string; name: string; typeArgs: TypeTag[] };
+  | {
+      kind: "struct";
+      address: string;
+      module: string;
+      name: string;
+      typeArgs: TypeTag[];
+    };
 
 // ---------- 解析：TypeTag 字符串 -> AST ----------
 export function parseTypeTagLite(input: string): TypeTag {
-  const s = input.replace(/\s+/g, "").replace(/^&mut\s+/, "").replace(/^&/, "");
+  const s = input
+    .replace(/\s+/g, "")
+    .replace(/^&mut\s+/, "")
+    .replace(/^&/, "");
   let i = 0;
 
-  function peek() { return s[i]; }
+  function peek() {
+    return s[i];
+  }
   function eat(ch?: string) {
     if (ch && s[i] !== ch) throw err(`Expected '${ch}'`);
     return s[i++];
@@ -144,9 +195,21 @@ export function parseTypeTagLite(input: string): TypeTag {
     }
 
     // primitives
-    const prims = ["bool","u8","u16","u32","u64","u128","u256","address"] as const;
+    const prims = [
+      "bool",
+      "u8",
+      "u16",
+      "u32",
+      "u64",
+      "u128",
+      "u256",
+      "address",
+    ] as const;
     for (const p of prims) {
-      if (s.startsWith(p, i)) { i += p.length; return { kind: p }; }
+      if (s.startsWith(p, i)) {
+        i += p.length;
+        return { kind: p };
+      }
     }
 
     // generic T / T0 / T1 ...
@@ -173,12 +236,20 @@ export function parseTypeTagLite(input: string): TypeTag {
       const name = parseIdent();
 
       // special cases mapping:
-      if (hex.toLowerCase() === "1" && module === "option" && name === "Option") {
+      if (
+        hex.toLowerCase() === "1" &&
+        module === "option" &&
+        name === "Option"
+      ) {
         const ta = maybeTypeArgs();
         if (ta.length !== 1) throw err("Option<T> expects 1 type arg");
         return { kind: "option", elem: ta[0] };
       }
-      if (hex.toLowerCase() === "1" && module === "string" && name === "String") {
+      if (
+        hex.toLowerCase() === "1" &&
+        module === "string" &&
+        name === "String"
+      ) {
         // 0x1::string::String
         maybeTypeArgs(); // should be none
         return { kind: "string" };
@@ -186,7 +257,13 @@ export function parseTypeTagLite(input: string): TypeTag {
 
       // object::Object<T> —— 视作 struct（如果你要特殊处理，可在 encodeArg 里定制）
       const typeArgs = maybeTypeArgs();
-      return { kind: "struct", address: "0x" + hex.toLowerCase(), module, name, typeArgs };
+      return {
+        kind: "struct",
+        address: "0x" + hex.toLowerCase(),
+        module,
+        name,
+        typeArgs,
+      };
     } else {
       // 也允许非 0x 开头的命名空间（若你有自家标准库别名）
       const ns = parseIdent();
@@ -198,11 +275,19 @@ export function parseTypeTagLite(input: string): TypeTag {
       const name = parseIdent();
 
       // 兼容 "std::string::String" 或别名（如果你的链做了别名映射，在此加判断）
-      if ((ns === "std" || ns === "aptos_std") && module === "string" && name === "String") {
+      if (
+        (ns === "std" || ns === "aptos_std") &&
+        module === "string" &&
+        name === "String"
+      ) {
         maybeTypeArgs();
         return { kind: "string" };
       }
-      if ((ns === "std" || ns === "aptos_std") && module === "option" && name === "Option") {
+      if (
+        (ns === "std" || ns === "aptos_std") &&
+        module === "option" &&
+        name === "Option"
+      ) {
         const ta = maybeTypeArgs();
         if (ta.length !== 1) throw err("Option<T> expects 1 type arg");
         return { kind: "option", elem: ta[0] };
@@ -226,7 +311,10 @@ export function parseTypeTagLite(input: string): TypeTag {
     const out: TypeTag[] = [];
     for (;;) {
       out.push(parseType());
-      if (peek() === ">") { eat(">"); break; }
+      if (peek() === ">") {
+        eat(">");
+        break;
+      }
       if (peek() !== ",") throw err("Expect ',' or '>' in type args");
       eat(",");
     }
@@ -238,8 +326,6 @@ export function parseTypeTagLite(input: string): TypeTag {
   return t;
 }
 
-
-
 // ---------- 泛型替换 ----------
 export function substituteGenerics(tag: TypeTag, typeArgs: TypeTag[]): TypeTag {
   switch (tag.kind) {
@@ -248,14 +334,20 @@ export function substituteGenerics(tag: TypeTag, typeArgs: TypeTag[]): TypeTag {
       if (!rep) throw new Error(`Missing type arg for T${tag.index}`);
       return rep;
     }
-    case "vector": return { kind: "vector", elem: substituteGenerics(tag.elem, typeArgs) };
-    case "option": return { kind: "option", elem: substituteGenerics(tag.elem, typeArgs) };
-    case "struct": return {
-      kind: "struct",
-      address: tag.address, module: tag.module, name: tag.name,
-      typeArgs: tag.typeArgs.map(t => substituteGenerics(t, typeArgs)),
-    };
-    default: return tag;
+    case "vector":
+      return { kind: "vector", elem: substituteGenerics(tag.elem, typeArgs) };
+    case "option":
+      return { kind: "option", elem: substituteGenerics(tag.elem, typeArgs) };
+    case "struct":
+      return {
+        kind: "struct",
+        address: tag.address,
+        module: tag.module,
+        name: tag.name,
+        typeArgs: tag.typeArgs.map((t) => substituteGenerics(t, typeArgs)),
+      };
+    default:
+      return tag;
   }
 }
 
@@ -264,12 +356,16 @@ function concatBytes(chunks: Uint8Array[]): Uint8Array {
   const len = chunks.reduce((a, b) => a + b.length, 0);
   const out = new Uint8Array(len);
   let o = 0;
-  for (const c of chunks) { out.set(c, o); o += c.length; }
+  for (const c of chunks) {
+    out.set(c, o);
+    o += c.length;
+  }
   return out;
 }
 
 function uleb128(n: number): Uint8Array {
-  if (!Number.isSafeInteger(n) || n < 0) throw new Error(`uleb128: invalid ${n}`);
+  if (!Number.isSafeInteger(n) || n < 0)
+    throw new Error(`uleb128: invalid ${n}`);
   const bytes: number[] = [];
   do {
     let b = n & 0x7f;
@@ -281,11 +377,15 @@ function uleb128(n: number): Uint8Array {
 }
 
 function leFromNumber(n: number, byteLen: number): Uint8Array {
-  if (!Number.isSafeInteger(n) || n < 0) throw new Error(`Range error for u${byteLen * 8}: ${n}`);
+  if (!Number.isSafeInteger(n) || n < 0)
+    throw new Error(`Range error for u${byteLen * 8}: ${n}`);
   const max = 2 ** (byteLen * 8) - 1;
   if (n > max) throw new Error(`Overflow for u${byteLen * 8}: ${n}`);
   const out = new Uint8Array(byteLen);
-  for (let i = 0; i < byteLen; i++) { out[i] = n & 0xff; n >>>= 8; }
+  for (let i = 0; i < byteLen; i++) {
+    out[i] = n & 0xff;
+    n >>>= 8;
+  }
   return out;
 }
 
@@ -293,7 +393,10 @@ function leFromBigint(x: bigint, byteLen: number): Uint8Array {
   if (x < 0n) throw new Error("negative bigint");
   const out = new Uint8Array(byteLen);
   let v = x;
-  for (let i = 0; i < byteLen; i++) { out[i] = Number(v & 0xffn); v >>= 8n; }
+  for (let i = 0; i < byteLen; i++) {
+    out[i] = Number(v & 0xffn);
+    v >>= 8n;
+  }
   if (v !== 0n) throw new Error(`Overflow for u${byteLen * 8}`);
   return out;
 }
@@ -301,7 +404,8 @@ function leFromBigint(x: bigint, byteLen: number): Uint8Array {
 function toBigint(v: unknown): bigint {
   if (typeof v === "bigint") return v;
   if (typeof v === "number") {
-    if (!Number.isFinite(v) || v < 0) throw new Error("bigint from number: invalid");
+    if (!Number.isFinite(v) || v < 0)
+      throw new Error("bigint from number: invalid");
     return BigInt(v);
   }
   if (typeof v === "string") {
@@ -318,7 +422,8 @@ function hexToBytes(hex: string): Uint8Array {
   if (h.length % 2 === 1) h = "0" + h;
   if (!/^[0-9a-f]+$/.test(h)) throw new Error("Invalid hex");
   const out = new Uint8Array(h.length / 2);
-  for (let i = 0; i < out.length; i++) out[i] = parseInt(h.slice(2 * i, 2 * i + 2), 16);
+  for (let i = 0; i < out.length; i++)
+    out[i] = parseInt(h.slice(2 * i, 2 * i + 2), 16);
   return out;
 }
 
@@ -356,9 +461,12 @@ export function encodeArg(tag: TypeTag, value: unknown): Uint8Array {
       if (typeof value !== "number") throw shape("number", value);
       return leFromNumber(value, 4);
     }
-    case "u64": return leFromBigint(toBigint(value), 8);
-    case "u128": return leFromBigint(toBigint(value), 16);
-    case "u256": return leFromBigint(toBigint(value), 32);
+    case "u64":
+      return leFromBigint(toBigint(value), 8);
+    case "u128":
+      return leFromBigint(toBigint(value), 16);
+    case "u256":
+      return leFromBigint(toBigint(value), 32);
 
     case "address": {
       if (typeof value !== "string" && !(value instanceof Uint8Array)) {
@@ -382,7 +490,7 @@ export function encodeArg(tag: TypeTag, value: unknown): Uint8Array {
       }
       // 一般 vector<T>
       if (!Array.isArray(value)) throw shape("Array", value);
-      const enc = (value as unknown[]).map(v => encodeArg(tag.elem, v));
+      const enc = (value as unknown[]).map((v) => encodeArg(tag.elem, v));
       const flat = concatBytes(enc);
       return concatBytes([uleb128(enc.length), flat]);
     }
@@ -405,32 +513,49 @@ export function encodeArg(tag: TypeTag, value: unknown): Uint8Array {
       //   - 0x1::object::Object<T> 想用 “对象ID地址” 作为入参时，可在这里特殊化为 address 编码
       //   - 其他自定义 struct 若在 entry 参数中出现，必须知道确切字段顺序和类型（BCS 顺序编码）
       const fq = `${tag.address}::${tag.module}::${tag.name}`;
-      if (tag.address.toLowerCase() === "0x1" && tag.module === "object" && tag.name === "Object") {
+      if (
+        tag.address.toLowerCase() === "0x1" &&
+        tag.module === "object" &&
+        tag.name === "Object"
+      ) {
         // 将 Object<T> 入参视为对象 ID（address）
         if (typeof value !== "string" && !(value instanceof Uint8Array)) {
           throw shape("object id (address)", value);
         }
         return addressTo32Bytes(value as any);
       }
-      if (tag.address.toLowerCase() === "0x1" && tag.module === "string" && tag.name === "String") {
+      if (
+        tag.address.toLowerCase() === "0x1" &&
+        tag.module === "string" &&
+        tag.name === "String"
+      ) {
         // 容错：等价 string 处理
         if (typeof value !== "string") throw shape("string", value);
         const bytes = te.encode(value);
         return concatBytes([uleb128(bytes.length), bytes]);
       }
-      throw new Error(`Unsupported struct in args: ${fq}. You can extend 'encodeArg' to handle it.`);
+      throw new Error(
+        `Unsupported struct in args: ${fq}. You can extend 'encodeArg' to handle it.`,
+      );
     }
   }
 
   function shape(exp: string, got: unknown) {
-    return new Error(`Argument shape error: expect ${exp}, got ${JSON.stringify(got)}`);
+    return new Error(
+      `Argument shape error: expect ${exp}, got ${JSON.stringify(got)}`,
+    );
   }
 
   function coerceBytes(v: unknown): Uint8Array {
     if (v instanceof Uint8Array) return v;
     if (typeof v === "string") return hexToBytes(v);
     if (Array.isArray(v)) {
-      if (!v.every(x => typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 255)) {
+      if (
+        !v.every(
+          (x) =>
+            typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 255,
+        )
+      ) {
         throw new Error("vector<u8> number[] must be 0..255");
       }
       return Uint8Array.from(v);
@@ -447,29 +572,41 @@ export function prepareBcsArgs(opts: {
 }): Uint8Array[] {
   const { paramTypeStrings, args, typeArgStrings = [] } = opts;
   if (paramTypeStrings.length !== args.length) {
-    throw new Error(`Argument count mismatch: expect ${paramTypeStrings.length}, got ${args.length}`);
+    throw new Error(
+      `Argument count mismatch: expect ${paramTypeStrings.length}, got ${args.length}`,
+    );
   }
   const paramTags = paramTypeStrings.map(parseTypeTagLite);
   const typeArgs = typeArgStrings.map(parseTypeTagLite);
 
-  const replaced = paramTags.map(t => substituteGenerics(t, typeArgs));
+  const replaced = paramTags.map((t) => substituteGenerics(t, typeArgs));
   return replaced.map((t, i) => encodeArg(t, args[i]));
 }
 
 export function bytesToHex(b: Uint8Array): string {
-  return "0x" + Array.from(b).map(x => x.toString(16).padStart(2, "0")).join("");
+  return (
+    "0x" +
+    Array.from(b)
+      .map((x) => x.toString(16).padStart(2, "0"))
+      .join("")
+  );
 }
 
 // 小工具：确保有足够的字节
 function need(data: Uint8Array, offset: number, bytes: number) {
   if (offset + bytes > data.length) {
-    throw new Error(`BCS underflow: need ${bytes} bytes at ${offset}, but only ${data.length - offset} left`);
+    throw new Error(
+      `BCS underflow: need ${bytes} bytes at ${offset}, but only ${data.length - offset} left`,
+    );
   }
 }
 
 function readULEB128(data: Uint8Array, offset: number): [number, number] {
-  let result = 0, shift = 0, o = offset;
-  for (let i = 0; i < 5; i++) { // 足够覆盖向量长度/元素数（一般很小）
+  let result = 0,
+    shift = 0,
+    o = offset;
+  for (let i = 0; i < 5; i++) {
+    // 足够覆盖向量长度/元素数（一般很小）
     need(data, o, 1);
     const byte = data[o++];
     result |= (byte & 0x7f) << shift;
@@ -479,17 +616,26 @@ function readULEB128(data: Uint8Array, offset: number): [number, number] {
   throw new Error("ULEB128 too large");
 }
 
-function readNumberLE(data: Uint8Array, offset: number, bytes: number): [number, number] {
+function readNumberLE(
+  data: Uint8Array,
+  offset: number,
+  bytes: number,
+): [number, number] {
   need(data, offset, bytes);
   let v = 0;
   for (let i = 0; i < bytes; i++) v |= data[offset + i] << (8 * i);
   return [v >>> 0, offset + bytes]; // 保证无符号
 }
 
-function readBigintLE(data: Uint8Array, offset: number, bytes: number): [bigint, number] {
+function readBigintLE(
+  data: Uint8Array,
+  offset: number,
+  bytes: number,
+): [bigint, number] {
   need(data, offset, bytes);
   let v = 0n;
-  for (let i = 0; i < bytes; i++) v |= BigInt(data[offset + i]) << BigInt(8 * i);
+  for (let i = 0; i < bytes; i++)
+    v |= BigInt(data[offset + i]) << BigInt(8 * i);
   return [v, offset + bytes];
 }
 
@@ -512,7 +658,11 @@ function bytesFrom(input: Uint8Array | string): Uint8Array {
 /**
  * 从 data[offset] 开始按 tag 读取一个值，返回 [value, newOffset]
  */
-export function decodeArg(tag: TypeTag, data: Uint8Array, offset = 0): [any, number] {
+export function decodeArg(
+  tag: TypeTag,
+  data: Uint8Array,
+  offset = 0,
+): [any, number] {
   switch (tag.kind) {
     case "bool": {
       need(data, offset, 1);
@@ -524,11 +674,16 @@ export function decodeArg(tag: TypeTag, data: Uint8Array, offset = 0): [any, num
       need(data, offset, 1);
       return [data[offset], offset + 1];
     }
-    case "u16": return readNumberLE(data, offset, 2);
-    case "u32": return readNumberLE(data, offset, 4);
-    case "u64": return readBigintLE(data, offset, 8);
-    case "u128": return readBigintLE(data, offset, 16);
-    case "u256": return readBigintLE(data, offset, 32);
+    case "u16":
+      return readNumberLE(data, offset, 2);
+    case "u32":
+      return readNumberLE(data, offset, 4);
+    case "u64":
+      return readBigintLE(data, offset, 8);
+    case "u128":
+      return readBigintLE(data, offset, 16);
+    case "u256":
+      return readBigintLE(data, offset, 32);
 
     case "address": {
       need(data, offset, 32);
@@ -579,7 +734,11 @@ export function decodeArg(tag: TypeTag, data: Uint8Array, offset = 0): [any, num
       const fq = `${tag.address}::${tag.module}::${tag.name}`;
 
       // 兼容：0x1::string::String 当作 string 编码
-      if (tag.address.toLowerCase() === "0x1" && tag.module === "string" && tag.name === "String") {
+      if (
+        tag.address.toLowerCase() === "0x1" &&
+        tag.module === "string" &&
+        tag.name === "String"
+      ) {
         const [len, o1] = readULEB128(data, offset);
         need(data, o1, len);
         const bytes = data.subarray(o1, o1 + len);
@@ -587,14 +746,20 @@ export function decodeArg(tag: TypeTag, data: Uint8Array, offset = 0): [any, num
       }
 
       // 兼容：0x1::object::Object<T> 当作对象 ID（address）
-      if (tag.address.toLowerCase() === "0x1" && tag.module === "object" && tag.name === "Object") {
+      if (
+        tag.address.toLowerCase() === "0x1" &&
+        tag.module === "object" &&
+        tag.name === "Object"
+      ) {
         need(data, offset, 32);
         const slice = data.subarray(offset, offset + 32);
         return [toAddressHexLong(slice), offset + 32];
       }
 
       // 其他 struct —— 需要你根据定义（字段顺序）自行扩展
-      throw new Error(`Unsupported struct in decode: ${fq}. Extend 'decodeArg' to handle it.`);
+      throw new Error(
+        `Unsupported struct in decode: ${fq}. Extend 'decodeArg' to handle it.`,
+      );
     }
   }
 }
@@ -604,7 +769,9 @@ export function decodeFromBytes(tag: TypeTag, input: Uint8Array | string): any {
   const bytes = bytesFrom(input);
   const [v, o] = decodeArg(tag, bytes, 0);
   if (o !== bytes.length) {
-    throw new Error(`Trailing bytes after decoding: consumed ${o}/${bytes.length}`);
+    throw new Error(
+      `Trailing bytes after decoding: consumed ${o}/${bytes.length}`,
+    );
   }
   return v;
 }
@@ -622,19 +789,20 @@ export function decodeBcsArgs(opts: {
 }): any[] {
   const { paramTypeStrings, bcsArgs, typeArgStrings = [] } = opts;
   if (paramTypeStrings.length !== bcsArgs.length) {
-    throw new Error(`Argument count mismatch: expect ${paramTypeStrings.length}, got ${bcsArgs.length}`);
+    throw new Error(
+      `Argument count mismatch: expect ${paramTypeStrings.length}, got ${bcsArgs.length}`,
+    );
   }
   const paramTags = paramTypeStrings.map(parseTypeTagLite);
   const typeArgs = typeArgStrings.map(parseTypeTagLite);
-  const replaced = paramTags.map(t => substituteGenerics(t, typeArgs));
+  const replaced = paramTags.map((t) => substituteGenerics(t, typeArgs));
   return replaced.map((t, i) => decodeFromBytes(t, bcsArgs[i]));
 }
 
-
 export function encodeArgsAptosTypes(
   tag: TypeTag,
-  value: unknown
-): EntryFunctionArgumentTypes{
+  value: unknown,
+): EntryFunctionArgumentTypes {
   switch (tag.kind) {
     case "bool":
       if (value === "true") return new Bool(true);
@@ -644,30 +812,48 @@ export function encodeArgsAptosTypes(
     case "u8":
       return new U8(Number(value));
     case "u16":
-      return new U16(Number(value)); 
+      return new U16(Number(value));
     case "address":
       return AccountAddress.fromString(value as string);
     case "string":
       return new MoveString(String(value));
     case "vector":
-      return new MoveVector( (value as []).map(item => encodeArgsAptosTypes(tag.elem, item)) );
+      return new MoveVector(
+        (value as []).map((item) => encodeArgsAptosTypes(tag.elem, item)),
+      );
     case "option":
-      return new MoveOption(value === null || value === undefined ? null : value === ""? null : encodeArgsAptosTypes(tag.elem, value));
+      return new MoveOption(
+        value === null || value === undefined
+          ? null
+          : value === ""
+            ? null
+            : encodeArgsAptosTypes(tag.elem, value),
+      );
     case "struct":
-      if( AccountAddress.fromString(tag.address).toString() === "0x1" && tag.module === "object" && tag.name === "Object") {
+      if (
+        AccountAddress.fromString(tag.address).toString() === "0x1" &&
+        tag.module === "object" &&
+        tag.name === "Object"
+      ) {
         return AccountAddress.from(value as string);
-      }else if (AccountAddress.fromString(tag.address).toString() === "0x1" && tag.module === "string" && tag.name === "String") {
+      } else if (
+        AccountAddress.fromString(tag.address).toString() === "0x1" &&
+        tag.module === "string" &&
+        tag.name === "String"
+      ) {
         return new MoveString(String(value));
       }
-      throw new Error(`Unsupported struct in encode: ${tag.address}::${tag.module}::${tag.name}`);
+      throw new Error(
+        `Unsupported struct in encode: ${tag.address}::${tag.module}::${tag.name}`,
+      );
   }
   throw new Error(`Unsupported type in encode: ${tag.kind}`);
 }
 
 export function encodeArgsPrimitivesTypes(
   tag: TypeTag,
-  value: unknown
-): SimpleEntryFunctionArgumentTypes{
+  value: unknown,
+): SimpleEntryFunctionArgumentTypes {
   switch (tag.kind) {
     case "bool":
       if (value === "true") return true;
@@ -692,8 +878,14 @@ export function encodeArgsPrimitivesTypes(
       return String(value);
     case "vector":
       const valueArray = JSON.parse(value as string) as unknown[];
-      return valueArray.map(item => encodeArgsPrimitivesTypes(tag.elem, item));
+      return valueArray.map((item) =>
+        encodeArgsPrimitivesTypes(tag.elem, item),
+      );
     case "option":
-      return value === null || value === undefined ? null : value === ""? null : encodeArgsPrimitivesTypes(tag.elem, value);
+      return value === null || value === undefined
+        ? null
+        : value === ""
+          ? null
+          : encodeArgsPrimitivesTypes(tag.elem, value);
   }
 }

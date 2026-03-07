@@ -1,16 +1,16 @@
-import { Suspense, lazy } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
-import LanguageLayout from './components/layout/LanguageLayout';
-import AppShell from './components/layout/AppShell';
-import PreferredLanguageRedirect from './components/navigation/PreferredLanguageRedirect';
-import HomePage from './pages/Home';
-import { useLanguage } from './context/LanguageContext';
+import { Suspense, lazy } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import LanguageLayout from "./components/layout/LanguageLayout";
+import AppShell from "./components/layout/AppShell";
+import PreferredLanguageRedirect from "./components/navigation/PreferredLanguageRedirect";
+import HomePage from "./pages/Home";
+import { useLanguage } from "./context/LanguageContext";
 
-const AptosLayout = lazy(() => import('./components/layout/AptosLayout'));
-const AptosToolPage = lazy(() => import('./pages/AptosTool'));
-const BcsToolPage = lazy(() => import('./pages/BcsTool'));
-const AptosAbiViewerPage = lazy(() => import('./pages/AptosAbiViewer'));
-const GasScheduleToolPage = lazy(() => import('./pages/GasScheduleTool'));
+const AptosLayout = lazy(() => import("./components/layout/AptosLayout"));
+const AptosToolPage = lazy(() => import("./pages/AptosTool"));
+const BcsToolPage = lazy(() => import("./pages/BcsTool"));
+const AptosAbiViewerPage = lazy(() => import("./pages/AptosAbiViewer"));
+const GasScheduleToolPage = lazy(() => import("./pages/GasScheduleTool"));
 
 function RouteLoader() {
   return (
@@ -24,8 +24,10 @@ function NotFoundPage() {
   const { t } = useLanguage();
   return (
     <div className="space-y-4 text-center">
-      <h2 className="text-2xl font-semibold text-slate-100">{t('notFound.title')}</h2>
-      <p className="text-sm text-slate-400">{t('notFound.message')}</p>
+      <h2 className="text-2xl font-semibold text-slate-100">
+        {t("notFound.title")}
+      </h2>
+      <p className="text-sm text-slate-400">{t("notFound.message")}</p>
     </div>
   );
 }
@@ -45,7 +47,10 @@ export default function App() {
               </Suspense>
             }
           >
-            <Route index element={<Navigate to="contract-interaction" replace />} />
+            <Route
+              index
+              element={<Navigate to="contract-interaction" replace />}
+            />
             <Route
               path="contract-interaction"
               element={
@@ -79,7 +84,10 @@ export default function App() {
               }
             />
           </Route>
-          <Route path="bcs" element={<Navigate to="aptos/bcs-tools" replace />} />
+          <Route
+            path="bcs"
+            element={<Navigate to="aptos/bcs-tools" replace />}
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

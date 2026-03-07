@@ -1,40 +1,52 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useLanguage } from '../context/LanguageContext';
-import { useAptosSettings } from '../context/AptosSettingsContext';
-import { APTOS_NETWORKS } from '../lib/networks';
-import { GasScheduleLookup } from '../lib/gasSchedule';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useLanguage } from "../context/LanguageContext";
+import { useAptosSettings } from "../context/AptosSettingsContext";
+import { APTOS_NETWORKS } from "../lib/networks";
+import { GasScheduleLookup } from "../lib/gasSchedule";
 
-type SortField = 'key' | 'value';
-type SortOrder = 'asc' | 'desc';
-type FilterType = 'all' | 'instr' | 'txn' | 'other';
+type SortField = "key" | "value";
+type SortOrder = "asc" | "desc";
+type FilterType = "all" | "instr" | "txn" | "other";
 
 export default function GasScheduleToolPage() {
   const { t } = useLanguage();
-  const { networkId, setNetworkId, customEndpoint, setCustomEndpoint, restEndpoint } = useAptosSettings();
+  const {
+    networkId,
+    setNetworkId,
+    customEndpoint,
+    setCustomEndpoint,
+    restEndpoint,
+  } = useAptosSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [entries, setEntries] = useState<Array<{ key: string; value: number }>>([]);
+  const [entries, setEntries] = useState<Array<{ key: string; value: number }>>(
+    [],
+  );
   const [featureVersion, setFeatureVersion] = useState<number | null>(null);
   const [scalingFactor, setScalingFactor] = useState<number | null>(null);
-  
+
   // 从 URL 参数初始化状态
-  const [searchPattern, setSearchPattern] = useState(() => searchParams.get('search') || '');
+  const [searchPattern, setSearchPattern] = useState(
+    () => searchParams.get("search") || "",
+  );
   const [filterType, setFilterType] = useState<FilterType>(() => {
-    const filter = searchParams.get('filter') as FilterType;
-    return filter && ['all', 'instr', 'txn', 'other'].includes(filter) ? filter : 'all';
+    const filter = searchParams.get("filter") as FilterType;
+    return filter && ["all", "instr", "txn", "other"].includes(filter)
+      ? filter
+      : "all";
   });
   const [sortField, setSortField] = useState<SortField>(() => {
-    const sort = searchParams.get('sortField') as SortField;
-    return sort && ['key', 'value'].includes(sort) ? sort : 'key';
+    const sort = searchParams.get("sortField") as SortField;
+    return sort && ["key", "value"].includes(sort) ? sort : "key";
   });
   const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
-    const order = searchParams.get('sortOrder') as SortOrder;
-    return order && ['asc', 'desc'].includes(order) ? order : 'asc';
+    const order = searchParams.get("sortOrder") as SortOrder;
+    return order && ["asc", "desc"].includes(order) ? order : "asc";
   });
   const [showExternalGas, setShowExternalGas] = useState(() => {
-    return searchParams.get('showExternal') === 'true';
+    return searchParams.get("showExternal") === "true";
   });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const lastLoadedEndpoint = useRef<string | null>(null);
@@ -45,12 +57,15 @@ export default function GasScheduleToolPage() {
   // 从 URL 参数初始化网络设置（仅在首次加载时）
   useEffect(() => {
     if (!urlInitialized.current) {
-      const urlNetwork = searchParams.get('network');
-      const urlCustomEndpoint = searchParams.get('customEndpoint');
-      
-      if (urlNetwork && ['mainnet', 'testnet', 'devnet', 'custom'].includes(urlNetwork)) {
-        setNetworkId(urlNetwork as 'mainnet' | 'testnet' | 'devnet' | 'custom');
-        if (urlNetwork === 'custom' && urlCustomEndpoint) {
+      const urlNetwork = searchParams.get("network");
+      const urlCustomEndpoint = searchParams.get("customEndpoint");
+
+      if (
+        urlNetwork &&
+        ["mainnet", "testnet", "devnet", "custom"].includes(urlNetwork)
+      ) {
+        setNetworkId(urlNetwork as "mainnet" | "testnet" | "devnet" | "custom");
+        if (urlNetwork === "custom" && urlCustomEndpoint) {
           setCustomEndpoint(urlCustomEndpoint);
         }
       }
@@ -61,40 +76,58 @@ export default function GasScheduleToolPage() {
   }, [searchParams, setNetworkId, setCustomEndpoint]);
 
   // 更新 URL 参数
-  const updateSearchParams = useCallback((updates: Record<string, string | null>) => {
-    if (isInitializingFromUrl.current) return;
-    
-    setSearchParams((prev) => {
-      const newParams = new URLSearchParams(prev);
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === null || value === '' || value === 'all' || value === 'false') {
-          newParams.delete(key);
-        } else {
-          newParams.set(key, value);
-        }
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      if (isInitializingFromUrl.current) return;
+
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (
+            value === null ||
+            value === "" ||
+            value === "all" ||
+            value === "false"
+          ) {
+            newParams.delete(key);
+          } else {
+            newParams.set(key, value);
+          }
+        });
+        return newParams;
       });
-      return newParams;
-    });
-  }, [setSearchParams]);
+    },
+    [setSearchParams],
+  );
 
   // 同步状态到 URL（排除初始化阶段）
   useEffect(() => {
     if (isInitializingFromUrl.current) return;
-    
+
     updateSearchParams({
       search: searchPattern || null,
-      filter: filterType !== 'all' ? filterType : null,
-      sortField: sortField !== 'key' ? sortField : null,
-      sortOrder: sortOrder !== 'asc' ? sortOrder : null,
-      showExternal: showExternalGas ? 'true' : null,
-      network: networkId !== 'testnet' ? networkId : null,
-      customEndpoint: networkId === 'custom' && customEndpoint ? customEndpoint : null,
+      filter: filterType !== "all" ? filterType : null,
+      sortField: sortField !== "key" ? sortField : null,
+      sortOrder: sortOrder !== "asc" ? sortOrder : null,
+      showExternal: showExternalGas ? "true" : null,
+      network: networkId !== "testnet" ? networkId : null,
+      customEndpoint:
+        networkId === "custom" && customEndpoint ? customEndpoint : null,
     });
-  }, [searchPattern, filterType, sortField, sortOrder, showExternalGas, networkId, customEndpoint, updateSearchParams]);
+  }, [
+    searchPattern,
+    filterType,
+    sortField,
+    sortOrder,
+    showExternalGas,
+    networkId,
+    customEndpoint,
+    updateSearchParams,
+  ]);
 
   const loadGasSchedule = useCallback(async () => {
     if (!restEndpoint) {
-      setError(t('gasSchedule.errors.missingEndpoint'));
+      setError(t("gasSchedule.errors.missingEndpoint"));
       return;
     }
 
@@ -113,7 +146,7 @@ export default function GasScheduleToolPage() {
       lastLoadedEndpoint.current = restEndpoint;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      setError(t('gasSchedule.errors.loadError', { message }));
+      setError(t("gasSchedule.errors.loadError", { message }));
       setEntries([]);
       setFeatureVersion(null);
       setScalingFactor(null);
@@ -126,7 +159,10 @@ export default function GasScheduleToolPage() {
   useEffect(() => {
     if (restEndpoint) {
       // 首次加载或 endpoint 变化时加载
-      if (!hasInitialLoad.current || restEndpoint !== lastLoadedEndpoint.current) {
+      if (
+        !hasInitialLoad.current ||
+        restEndpoint !== lastLoadedEndpoint.current
+      ) {
         hasInitialLoad.current = true;
         loadGasSchedule();
       }
@@ -140,7 +176,7 @@ export default function GasScheduleToolPage() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      console.error("Failed to copy:", err);
     }
   };
 
@@ -150,16 +186,20 @@ export default function GasScheduleToolPage() {
     // 应用搜索过滤
     if (searchPattern.trim()) {
       const pattern = searchPattern.toLowerCase();
-      filtered = filtered.filter((entry) => entry.key.toLowerCase().includes(pattern));
+      filtered = filtered.filter((entry) =>
+        entry.key.toLowerCase().includes(pattern),
+      );
     }
 
     // 应用类型过滤
-    if (filterType !== 'all') {
+    if (filterType !== "all") {
       filtered = filtered.filter((entry) => {
-        if (filterType === 'instr') return entry.key.startsWith('instr.');
-        if (filterType === 'txn') return entry.key.startsWith('txn.');
-        if (filterType === 'other') {
-          return !entry.key.startsWith('instr.') && !entry.key.startsWith('txn.');
+        if (filterType === "instr") return entry.key.startsWith("instr.");
+        if (filterType === "txn") return entry.key.startsWith("txn.");
+        if (filterType === "other") {
+          return (
+            !entry.key.startsWith("instr.") && !entry.key.startsWith("txn.")
+          );
         }
         return true;
       });
@@ -168,25 +208,31 @@ export default function GasScheduleToolPage() {
     // 应用排序
     filtered.sort((a, b) => {
       let comparison = 0;
-      if (sortField === 'key') {
+      if (sortField === "key") {
         comparison = a.key.localeCompare(b.key);
       } else {
         comparison = a.value - b.value;
       }
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return filtered;
   }, [entries, searchPattern, filterType, sortField, sortOrder]);
 
   const statistics = useMemo(() => {
-    const instrCount = entries.filter((e) => e.key.startsWith('instr.')).length;
-    const txnCount = entries.filter((e) => e.key.startsWith('txn.')).length;
+    const instrCount = entries.filter((e) => e.key.startsWith("instr.")).length;
+    const txnCount = entries.filter((e) => e.key.startsWith("txn.")).length;
     const otherCount = entries.length - instrCount - txnCount;
-    const minValue = entries.length > 0 ? Math.min(...entries.map((e) => e.value)) : 0;
-    const maxValue = entries.length > 0 ? Math.max(...entries.map((e) => e.value)) : 0;
+    const minValue =
+      entries.length > 0 ? Math.min(...entries.map((e) => e.value)) : 0;
+    const maxValue =
+      entries.length > 0 ? Math.max(...entries.map((e) => e.value)) : 0;
     const avgValue =
-      entries.length > 0 ? Math.floor(entries.reduce((sum, e) => sum + e.value, 0) / entries.length) : 0;
+      entries.length > 0
+        ? Math.floor(
+            entries.reduce((sum, e) => sum + e.value, 0) / entries.length,
+          )
+        : 0;
 
     return {
       total: entries.length,
@@ -195,15 +241,18 @@ export default function GasScheduleToolPage() {
       other: otherCount,
       min: minValue,
       max: maxValue,
-      avg: avgValue
+      avg: avgValue,
     };
   }, [entries]);
 
   const formatValue = (value: number) => {
     if (showExternalGas && scalingFactor) {
-      const external = GasScheduleLookup.internalToExternal(value, scalingFactor);
+      const external = GasScheduleLookup.internalToExternal(
+        value,
+        scalingFactor,
+      );
       // 格式化外部 Gas 单位，保留足够的小数位，但去掉末尾的0
-      const externalFormatted = external.toFixed(6).replace(/\.?0+$/, '');
+      const externalFormatted = external.toFixed(6).replace(/\.?0+$/, "");
       return `${value.toLocaleString()} (${externalFormatted} external)`;
     }
     return value.toLocaleString();
@@ -212,19 +261,25 @@ export default function GasScheduleToolPage() {
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{t('gasSchedule.title')}</h1>
-        <p className="text-slate-300">{t('gasSchedule.description')}</p>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {t("gasSchedule.title")}
+        </h1>
+        <p className="text-slate-300">{t("gasSchedule.description")}</p>
       </header>
 
       <section className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-            {t('aptos.network.label')}
+            {t("aptos.network.label")}
             <select
               className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
               value={networkId}
               onChange={(event) => {
-                const nextNetwork = event.target.value as 'mainnet' | 'testnet' | 'devnet' | 'custom';
+                const nextNetwork = event.target.value as
+                  | "mainnet"
+                  | "testnet"
+                  | "devnet"
+                  | "custom";
                 setNetworkId(nextNetwork);
               }}
             >
@@ -233,23 +288,25 @@ export default function GasScheduleToolPage() {
                   {network.label}
                 </option>
               ))}
-              <option value="custom">{t('aptos.network.customOption')}</option>
+              <option value="custom">{t("aptos.network.customOption")}</option>
             </select>
           </label>
 
-          {networkId === 'custom' ? (
+          {networkId === "custom" ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-              {t('aptos.network.customLabel')}
+              {t("aptos.network.customLabel")}
               <input
                 className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-                placeholder={t('aptos.network.customPlaceholder')}
+                placeholder={t("aptos.network.customPlaceholder")}
                 value={customEndpoint}
                 onChange={(event) => setCustomEndpoint(event.target.value)}
               />
             </label>
           ) : (
             <div className="flex flex-col gap-2 text-sm text-slate-400">
-              <span className="font-medium text-slate-300">{t('aptos.network.restLabel')}</span>
+              <span className="font-medium text-slate-300">
+                {t("aptos.network.restLabel")}
+              </span>
               <span className="truncate rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs">
                 {restEndpoint}
               </span>
@@ -263,7 +320,9 @@ export default function GasScheduleToolPage() {
           className="w-full rounded-lg bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
           disabled={loading}
         >
-          {loading ? t('gasSchedule.actions.loading') : t('gasSchedule.actions.reload')}
+          {loading
+            ? t("gasSchedule.actions.loading")
+            : t("gasSchedule.actions.reload")}
         </button>
 
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}
@@ -273,59 +332,96 @@ export default function GasScheduleToolPage() {
         <section className="space-y-6">
           {/* Statistics */}
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-            <h2 className="text-xl font-semibold text-slate-100 mb-4">{t('gasSchedule.statistics.title')}</h2>
+            <h2 className="text-xl font-semibold text-slate-100 mb-4">
+              {t("gasSchedule.statistics.title")}
+            </h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-2">{t('gasSchedule.statistics.featureVersion')}</h3>
-                <p className="text-lg font-mono text-slate-100">{featureVersion ?? 'N/A'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-2">{t('gasSchedule.statistics.scalingFactor')}</h3>
+                <h3 className="text-sm font-medium text-slate-300 mb-2">
+                  {t("gasSchedule.statistics.featureVersion")}
+                </h3>
                 <p className="text-lg font-mono text-slate-100">
-                  {scalingFactor ? scalingFactor.toLocaleString() : 'N/A'}
+                  {featureVersion ?? "N/A"}
                 </p>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-2">{t('gasSchedule.statistics.totalEntries')}</h3>
-                <p className="text-lg font-mono text-slate-100">{statistics.total}</p>
+                <h3 className="text-sm font-medium text-slate-300 mb-2">
+                  {t("gasSchedule.statistics.scalingFactor")}
+                </h3>
+                <p className="text-lg font-mono text-slate-100">
+                  {scalingFactor ? scalingFactor.toLocaleString() : "N/A"}
+                </p>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-2">{t('gasSchedule.statistics.filteredEntries')}</h3>
-                <p className="text-lg font-mono text-slate-100">{filteredAndSortedEntries.length}</p>
+                <h3 className="text-sm font-medium text-slate-300 mb-2">
+                  {t("gasSchedule.statistics.totalEntries")}
+                </h3>
+                <p className="text-lg font-mono text-slate-100">
+                  {statistics.total}
+                </p>
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-slate-300 mb-2">
+                  {t("gasSchedule.statistics.filteredEntries")}
+                </h3>
+                <p className="text-lg font-mono text-slate-100">
+                  {filteredAndSortedEntries.length}
+                </p>
               </div>
             </div>
             <div className="mt-4 pt-4 border-t border-slate-700 grid gap-4 md:grid-cols-3">
               <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-2">{t('gasSchedule.statistics.byType')}</h3>
+                <h3 className="text-sm font-medium text-slate-300 mb-2">
+                  {t("gasSchedule.statistics.byType")}
+                </h3>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-400"></span>
                     <span className="text-slate-400">instr.*:</span>
-                    <span className="text-slate-200 font-mono">{statistics.instr}</span>
+                    <span className="text-slate-200 font-mono">
+                      {statistics.instr}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-400"></span>
                     <span className="text-slate-400">txn.*:</span>
-                    <span className="text-slate-200 font-mono">{statistics.txn}</span>
+                    <span className="text-slate-200 font-mono">
+                      {statistics.txn}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-purple-400"></span>
-                    <span className="text-slate-400">{t('gasSchedule.statistics.other')}:</span>
-                    <span className="text-slate-200 font-mono">{statistics.other}</span>
+                    <span className="text-slate-400">
+                      {t("gasSchedule.statistics.other")}:
+                    </span>
+                    <span className="text-slate-200 font-mono">
+                      {statistics.other}
+                    </span>
                   </div>
                 </div>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-slate-300 mb-2">{t('gasSchedule.statistics.valueRange')}</h3>
+                <h3 className="text-sm font-medium text-slate-300 mb-2">
+                  {t("gasSchedule.statistics.valueRange")}
+                </h3>
                 <div className="space-y-1 text-sm">
                   <div className="text-slate-400">
-                    {t('gasSchedule.statistics.min')}: <span className="text-slate-200 font-mono">{statistics.min.toLocaleString()}</span>
+                    {t("gasSchedule.statistics.min")}:{" "}
+                    <span className="text-slate-200 font-mono">
+                      {statistics.min.toLocaleString()}
+                    </span>
                   </div>
                   <div className="text-slate-400">
-                    {t('gasSchedule.statistics.max')}: <span className="text-slate-200 font-mono">{statistics.max.toLocaleString()}</span>
+                    {t("gasSchedule.statistics.max")}:{" "}
+                    <span className="text-slate-200 font-mono">
+                      {statistics.max.toLocaleString()}
+                    </span>
                   </div>
                   <div className="text-slate-400">
-                    {t('gasSchedule.statistics.avg')}: <span className="text-slate-200 font-mono">{statistics.avg.toLocaleString()}</span>
+                    {t("gasSchedule.statistics.avg")}:{" "}
+                    <span className="text-slate-200 font-mono">
+                      {statistics.avg.toLocaleString()}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -334,57 +430,81 @@ export default function GasScheduleToolPage() {
 
           {/* Filters and Sort */}
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
-            <h2 className="text-xl font-semibold text-slate-100">{t('gasSchedule.filters.title')}</h2>
-            
+            <h2 className="text-xl font-semibold text-slate-100">
+              {t("gasSchedule.filters.title")}
+            </h2>
+
             <div className="grid gap-4 md:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-                {t('gasSchedule.filters.search')}
+                {t("gasSchedule.filters.search")}
                 <input
                   type="text"
                   className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
-                  placeholder={t('gasSchedule.filters.searchPlaceholder')}
+                  placeholder={t("gasSchedule.filters.searchPlaceholder")}
                   value={searchPattern}
                   onChange={(event) => setSearchPattern(event.target.value)}
                 />
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-                {t('gasSchedule.filters.type')}
+                {t("gasSchedule.filters.type")}
                 <select
                   className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
                   value={filterType}
-                  onChange={(event) => setFilterType(event.target.value as FilterType)}
+                  onChange={(event) =>
+                    setFilterType(event.target.value as FilterType)
+                  }
                 >
-                  <option value="all">{t('gasSchedule.filters.typeAll')}</option>
-                  <option value="instr">{t('gasSchedule.filters.typeInstr')}</option>
-                  <option value="txn">{t('gasSchedule.filters.typeTxn')}</option>
-                  <option value="other">{t('gasSchedule.filters.typeOther')}</option>
+                  <option value="all">
+                    {t("gasSchedule.filters.typeAll")}
+                  </option>
+                  <option value="instr">
+                    {t("gasSchedule.filters.typeInstr")}
+                  </option>
+                  <option value="txn">
+                    {t("gasSchedule.filters.typeTxn")}
+                  </option>
+                  <option value="other">
+                    {t("gasSchedule.filters.typeOther")}
+                  </option>
                 </select>
               </label>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-                {t('gasSchedule.filters.sortBy')}
+                {t("gasSchedule.filters.sortBy")}
                 <select
                   className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
                   value={sortField}
-                  onChange={(event) => setSortField(event.target.value as SortField)}
+                  onChange={(event) =>
+                    setSortField(event.target.value as SortField)
+                  }
                 >
-                  <option value="key">{t('gasSchedule.filters.sortKey')}</option>
-                  <option value="value">{t('gasSchedule.filters.sortValue')}</option>
+                  <option value="key">
+                    {t("gasSchedule.filters.sortKey")}
+                  </option>
+                  <option value="value">
+                    {t("gasSchedule.filters.sortValue")}
+                  </option>
                 </select>
               </label>
 
               <label className="flex flex-col gap-2 text-sm font-medium text-slate-200">
-                {t('gasSchedule.filters.sortOrder')}
+                {t("gasSchedule.filters.sortOrder")}
                 <select
                   className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100"
                   value={sortOrder}
-                  onChange={(event) => setSortOrder(event.target.value as SortOrder)}
+                  onChange={(event) =>
+                    setSortOrder(event.target.value as SortOrder)
+                  }
                 >
-                  <option value="asc">{t('gasSchedule.filters.sortAsc')}</option>
-                  <option value="desc">{t('gasSchedule.filters.sortDesc')}</option>
+                  <option value="asc">
+                    {t("gasSchedule.filters.sortAsc")}
+                  </option>
+                  <option value="desc">
+                    {t("gasSchedule.filters.sortDesc")}
+                  </option>
                 </select>
               </label>
             </div>
@@ -396,7 +516,7 @@ export default function GasScheduleToolPage() {
                 onChange={(event) => setShowExternalGas(event.target.checked)}
                 className="h-4 w-4 rounded border-slate-700 bg-slate-900"
               />
-              <span>{t('gasSchedule.filters.showExternalGas')}</span>
+              <span>{t("gasSchedule.filters.showExternalGas")}</span>
             </label>
           </div>
 
@@ -404,16 +524,21 @@ export default function GasScheduleToolPage() {
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <h2 className="text-xl font-semibold text-slate-100">
-                {t('gasSchedule.entries.title')} ({filteredAndSortedEntries.length})
+                {t("gasSchedule.entries.title")} (
+                {filteredAndSortedEntries.length})
               </h2>
               <button
                 onClick={() => {
-                  const allKeys = filteredAndSortedEntries.map((e) => e.key).join('\n');
-                  copyToClipboard(allKeys, 'all-keys');
+                  const allKeys = filteredAndSortedEntries
+                    .map((e) => e.key)
+                    .join("\n");
+                  copyToClipboard(allKeys, "all-keys");
                 }}
                 className="px-3 py-1 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
               >
-                {copiedId === 'all-keys' ? t('gasSchedule.actions.copied') : t('gasSchedule.actions.copyAllKeys')}
+                {copiedId === "all-keys"
+                  ? t("gasSchedule.actions.copied")
+                  : t("gasSchedule.actions.copyAllKeys")}
               </button>
             </div>
             <div className="overflow-x-auto">
@@ -421,23 +546,26 @@ export default function GasScheduleToolPage() {
                 <thead className="bg-slate-800/50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                      {t('gasSchedule.entries.key')}
+                      {t("gasSchedule.entries.key")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">
-                      {t('gasSchedule.entries.value')}
+                      {t("gasSchedule.entries.value")}
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-300 uppercase tracking-wider w-24">
-                      {t('gasSchedule.entries.actions')}
+                      {t("gasSchedule.entries.actions")}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700">
                   {filteredAndSortedEntries.map((entry, index) => {
                     const entryId = `entry-${index}`;
-                    const isInstr = entry.key.startsWith('instr.');
-                    const isTxn = entry.key.startsWith('txn.');
+                    const isInstr = entry.key.startsWith("instr.");
+                    const isTxn = entry.key.startsWith("txn.");
                     return (
-                      <tr key={entry.key} className="hover:bg-slate-800/30 transition-colors">
+                      <tr
+                        key={entry.key}
+                        className="hover:bg-slate-800/30 transition-colors"
+                      >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             {isInstr && (
@@ -450,18 +578,24 @@ export default function GasScheduleToolPage() {
                                 txn
                               </span>
                             )}
-                            <span className="text-sm font-mono text-slate-200">{entry.key}</span>
+                            <span className="text-sm font-mono text-slate-200">
+                              {entry.key}
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-sm font-mono text-slate-300">{formatValue(entry.value)}</span>
+                          <span className="text-sm font-mono text-slate-300">
+                            {formatValue(entry.value)}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => copyToClipboard(entry.key, entryId)}
                             className="px-2 py-1 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
                           >
-                            {copiedId === entryId ? t('gasSchedule.actions.copied') : t('gasSchedule.actions.copy')}
+                            {copiedId === entryId
+                              ? t("gasSchedule.actions.copied")
+                              : t("gasSchedule.actions.copy")}
                           </button>
                         </td>
                       </tr>
@@ -471,7 +605,7 @@ export default function GasScheduleToolPage() {
               </table>
               {filteredAndSortedEntries.length === 0 && (
                 <div className="p-8 text-center text-slate-400">
-                  {t('gasSchedule.entries.empty')}
+                  {t("gasSchedule.entries.empty")}
                 </div>
               )}
             </div>
@@ -481,4 +615,3 @@ export default function GasScheduleToolPage() {
     </div>
   );
 }
-

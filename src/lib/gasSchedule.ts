@@ -26,7 +26,7 @@ export class GasScheduleLookup {
   private entries: Map<string, number> = new Map();
 
   constructor(options: GasScheduleLookupOptions = {}) {
-    this.nodeUrl = options.nodeUrl || 'https://fullnode.mainnet.aptoslabs.com';
+    this.nodeUrl = options.nodeUrl || "https://fullnode.mainnet.aptoslabs.com";
     this.cacheTimeout = options.cacheTimeout || 60 * 60 * 1000; // 默认 60 分钟
   }
 
@@ -35,37 +35,41 @@ export class GasScheduleLookup {
    */
   async fetchGasSchedule(): Promise<GasScheduleV2Response> {
     const now = Date.now();
-    
+
     // 检查缓存是否有效
-    if (this.cache && (now - this.cacheTime) < this.cacheTimeout) {
+    if (this.cache && now - this.cacheTime < this.cacheTimeout) {
       return this.cache;
     }
 
     try {
       // Ensure nodeUrl doesn't have trailing slash and doesn't already include /v1
-      const baseUrl = this.nodeUrl.replace(/\/$/, '');
-      const resourceType = '0x1::gas_schedule::GasScheduleV2';
+      const baseUrl = this.nodeUrl.replace(/\/$/, "");
+      const resourceType = "0x1::gas_schedule::GasScheduleV2";
       const encodedResourceType = encodeURIComponent(resourceType);
-      
+
       // Check if baseUrl already contains /v1, if not add it
-      const apiBase = baseUrl.includes('/v1') ? baseUrl : `${baseUrl}/v1`;
+      const apiBase = baseUrl.includes("/v1") ? baseUrl : `${baseUrl}/v1`;
       const url = `${apiBase}/accounts/0x1/resource/${encodedResourceType}`;
-      
+
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error(`GasScheduleV2 resource not found. This resource may not be available on the selected network (${this.nodeUrl}). Try switching to mainnet.`);
+          throw new Error(
+            `GasScheduleV2 resource not found. This resource may not be available on the selected network (${this.nodeUrl}). Try switching to mainnet.`,
+          );
         }
-        throw new Error(`Failed to fetch GasScheduleV2: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch GasScheduleV2: ${response.status} ${response.statusText}`,
+        );
       }
 
       const data: GasScheduleV2Response = await response.json();
-      
+
       // 更新缓存
       this.cache = data;
       this.cacheTime = now;
-      
+
       // 构建 entries map
       this.entries.clear();
       for (const entry of data.data.entries) {
@@ -74,7 +78,9 @@ export class GasScheduleLookup {
 
       return data;
     } catch (error) {
-      throw new Error(`Error fetching GasScheduleV2: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Error fetching GasScheduleV2: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -101,13 +107,13 @@ export class GasScheduleLookup {
     await this.fetchGasSchedule();
     const patternLower = pattern.toLowerCase();
     const results = new Map<string, number>();
-    
+
     for (const [key, value] of this.entries.entries()) {
       if (key.toLowerCase().includes(patternLower)) {
         results.set(key, value);
       }
     }
-    
+
     return results;
   }
 
@@ -117,13 +123,13 @@ export class GasScheduleLookup {
   async getInstructionCosts(): Promise<Map<string, number>> {
     await this.fetchGasSchedule();
     const results = new Map<string, number>();
-    
+
     for (const [key, value] of this.entries.entries()) {
-      if (key.startsWith('instr.')) {
+      if (key.startsWith("instr.")) {
         results.set(key, value);
       }
     }
-    
+
     return results;
   }
 
@@ -133,13 +139,13 @@ export class GasScheduleLookup {
   async getTransactionParams(): Promise<Map<string, number>> {
     await this.fetchGasSchedule();
     const results = new Map<string, number>();
-    
+
     for (const [key, value] of this.entries.entries()) {
-      if (key.startsWith('txn.')) {
+      if (key.startsWith("txn.")) {
         results.set(key, value);
       }
     }
-    
+
     return results;
   }
 
@@ -149,27 +155,36 @@ export class GasScheduleLookup {
   async getLimits(): Promise<Map<string, number>> {
     const params = await this.getTransactionParams();
     const results = new Map<string, number>();
-    
+
     for (const [key, value] of params.entries()) {
-      if (key.toLowerCase().includes('max') || key.toLowerCase().includes('min')) {
+      if (
+        key.toLowerCase().includes("max") ||
+        key.toLowerCase().includes("min")
+      ) {
         results.set(key, value);
       }
     }
-    
+
     return results;
   }
 
   /**
    * 将 InternalGas 转换为外部 Gas Units
    */
-  static internalToExternal(internalGas: number, scalingFactor: number = 1_000_000): number {
+  static internalToExternal(
+    internalGas: number,
+    scalingFactor: number = 1_000_000,
+  ): number {
     return internalGas / scalingFactor;
   }
 
   /**
    * 将外部 Gas Units 转换为 InternalGas
    */
-  static externalToInternal(externalGas: number, scalingFactor: number = 1_000_000): number {
+  static externalToInternal(
+    externalGas: number,
+    scalingFactor: number = 1_000_000,
+  ): number {
     return externalGas * scalingFactor;
   }
 
@@ -177,7 +192,7 @@ export class GasScheduleLookup {
    * 获取 gas_unit_scaling_factor
    */
   async getScalingFactor(): Promise<number> {
-    const factor = await this.lookup('txn.gas_unit_scaling_factor');
+    const factor = await this.lookup("txn.gas_unit_scaling_factor");
     return factor ?? 1_000_000;
   }
 
@@ -202,7 +217,10 @@ export class GasScheduleLookup {
    */
   async getAllEntries(): Promise<Array<{ key: string; value: number }>> {
     await this.fetchGasSchedule();
-    return Array.from(this.entries.entries()).map(([key, value]) => ({ key, value }));
+    return Array.from(this.entries.entries()).map(([key, value]) => ({
+      key,
+      value,
+    }));
   }
 
   /**
@@ -218,7 +236,7 @@ export class GasScheduleLookup {
 // 导出便捷函数
 export async function lookupGasCost(
   key: string,
-  options?: GasScheduleLookupOptions
+  options?: GasScheduleLookupOptions,
 ): Promise<number | null> {
   const lookup = new GasScheduleLookup(options);
   return await lookup.lookup(key);
@@ -226,7 +244,7 @@ export async function lookupGasCost(
 
 export async function searchGasCosts(
   pattern: string,
-  options?: GasScheduleLookupOptions
+  options?: GasScheduleLookupOptions,
 ): Promise<Map<string, number>> {
   const lookup = new GasScheduleLookup(options);
   return await lookup.search(pattern);
@@ -234,4 +252,3 @@ export async function searchGasCosts(
 
 // 默认导出
 export default GasScheduleLookup;
-
